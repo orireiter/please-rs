@@ -1,24 +1,12 @@
+use std::env::{self, current_dir};
 use std::io::Write;
 use std::process;
 use std::str::SplitWhitespace;
-use std::{
-    env::{self, current_dir},
-    fmt::Display,
-};
 
 use anyhow::{Context, Result};
 
 pub struct LiveCommand {
     pub user_command: Vec<char>,
-}
-
-impl Display for LiveCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match current_dir() {
-            Ok(dir) => write!(f, "{}", dir.display()),
-            Err(e) => write!(f, "<error: {e}>"),
-        }
-    }
 }
 
 impl LiveCommand {
@@ -37,7 +25,7 @@ impl LiveCommand {
             return Ok(CommandOutcome::Continue);
         }
 
-        let command_as_string = self.user_command.iter().collect::<String>();
+        let command_as_string = self.user_command_as_string();
         self.user_command.clear();
 
         if command_as_string == "\n" {
@@ -68,6 +56,21 @@ impl LiveCommand {
         stdout.flush()?;
 
         Ok(CommandOutcome::Continue)
+    }
+
+    pub fn user_command_as_string(&self) -> String {
+        self.user_command.iter().collect::<String>()
+    }
+
+    pub fn live_command_prefix(&self) -> String {
+        let dir_part = match current_dir() {
+            Ok(dir) => dir.display().to_string(),
+            Err(e) => format!("<error: {e}>"),
+        };
+
+        let delimiter = "-> ";
+
+        format!("{dir_part}{delimiter}")
     }
 
     fn get_base_process_command(&self, executable: &str) -> Result<process::Command> {
