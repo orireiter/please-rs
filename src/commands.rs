@@ -18,8 +18,6 @@ impl LiveCommand {
 
     pub fn execute_user_command(&mut self) -> Result<CommandOutcome> {
         let mut stdout = std::io::stdout();
-        println!();
-        stdout.flush()?;
 
         if self.user_command.is_empty() {
             return Ok(CommandOutcome::Continue);
@@ -68,7 +66,7 @@ impl LiveCommand {
             Err(e) => format!("<error: {e}>"),
         };
 
-        let delimiter = "-> ";
+        let delimiter = " -> ";
 
         format!("{dir_part}{delimiter}")
     }

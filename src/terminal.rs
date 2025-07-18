@@ -35,7 +35,7 @@ impl PleaseTerminal {
                     if let Some(c) = as_char {
                         self.handle_char_added(&mut stdout, c)?;
                     } else if key_event.code.is_enter() {
-                        if let CommandOutcome::Close = self.handle_enter_pressed() {
+                        if let CommandOutcome::Close = self.handle_enter_pressed(&mut stdout) {
                             return Ok(());
                         };
                     } else if key_event.code.is_backspace() {
@@ -59,8 +59,17 @@ impl PleaseTerminal {
             .context(format!("failed to flush after adding char {c}"))
     }
 
-    fn handle_enter_pressed(&mut self) -> CommandOutcome {
-        match self.live_command.execute_user_command() {
+    fn handle_enter_pressed(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
+        println!();
+        if let Err(e) = stdout.flush() {
+            log::error!("failed to flush newline before executing user command, error: {e}");
+            return CommandOutcome::Continue;
+        };
+
+        let command_execution_result = self.live_command.execute_user_command();
+
+        let command_outcome = match command_execution_result {
+            Ok(CommandOutcome::Close) => return CommandOutcome::Close,
             Ok(command_outcome) => command_outcome,
             Err(e) => {
                 log::error!(
@@ -70,10 +79,21 @@ impl PleaseTerminal {
                 );
                 CommandOutcome::Continue
             }
-        }
+        };
+
+        print!("{}", self.live_command.live_command_prefix());
+        if let Err(e) = stdout.flush() {
+            log::error!("failed to flush command preffix after executing user command, error: {e}");
+        };
+
+        command_outcome
     }
 
     fn handle_backspace(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        if self.live_command.user_command.is_empty() {
+            return Ok(());
+        }
+
         self.live_command.user_command.pop();
 
         let (x, y) = crossterm_cursor::position()?;
