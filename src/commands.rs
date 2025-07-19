@@ -1,9 +1,97 @@
 use std::env::{self, current_dir};
 use std::io::Write;
 use std::process;
-use std::str::SplitWhitespace;
+use std::str::{FromStr, SplitWhitespace};
 
 use anyhow::{Context, Result};
+
+const RESERVED_CMD_COMMANDS: [&str; 83] = [
+    "ASSOC",
+    "ATTRIB",
+    "BREAK",
+    "BCDEDIT",
+    "CACLS",
+    "CALL",
+    "CD",
+    "CHCP",
+    "CHDIR",
+    "CHKDSK",
+    "CHKNTFS",
+    "CLS",
+    "CMD",
+    "COLOR",
+    "COMP",
+    "COMPACT",
+    "CONVERT",
+    "COPY",
+    "DATE",
+    "DEL",
+    "DIR",
+    "DISKPART",
+    "DOSKEY",
+    "DRIVERQUER",
+    "ECHO",
+    "ENDLOCAL",
+    "ERASE",
+    "EXIT",
+    "FC",
+    "FIND",
+    "FINDSTR",
+    "FOR",
+    "FORMAT",
+    "FSUTIL",
+    "FTYPE",
+    "GOTO",
+    "GPRESULT",
+    "HELP",
+    "ICACLS",
+    "IF",
+    "LABEL",
+    "MD",
+    "MKDIR",
+    "MKLINK",
+    "MODE",
+    "MORE",
+    "MOVE",
+    "OPENFILES",
+    "PATH",
+    "PAUSE",
+    "POPD",
+    "PRINT",
+    "PROMPT",
+    "PUSHD",
+    "RD",
+    "RECOVER",
+    "REM",
+    "REN",
+    "RENAME",
+    "REPLACE",
+    "RMDIR",
+    "ROBOCOPY",
+    "SET",
+    "SETLOCAL",
+    "SC",
+    "SCHTASKS",
+    "SHIFT",
+    "SHUTDOWN",
+    "SORT",
+    "START",
+    "SUBST",
+    "SYSTEMINFO",
+    "TASKLIST",
+    "TASKKILL",
+    "TIME",
+    "TITLE",
+    "TREE",
+    "TYPE",
+    "VER",
+    "VERIFY",
+    "VOL",
+    "XCOPY",
+    "WMIC",
+];
+
+const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 3] = ["", ".exe", ".bat"];
 
 pub struct LiveCommand {
     pub user_command: Vec<char>,
@@ -38,16 +126,18 @@ impl LiveCommand {
             return Ok(CommandOutcome::Continue);
         };
 
-        if executable == PleaseCommand::EXECUTABLE_NAME {
+        if PleaseCommand::is_please_command(executable) {
             let please_command = PleaseCommand::try_from(splitted_command)?;
-            return please_command.handle_please_command();
+            return please_command.execute_command();
+        } else if let Ok(native_command) = NativeCommand::from_str(executable) {
+            return native_command.execute_command();
         }
 
-        let base_command = &mut self.get_base_process_command(executable).context(format!(
+        let user_command = &mut self.get_base_process_command(executable).context(format!(
             "failed to build base command for {executable} with {splitted_command:?}"
         ))?;
 
-        let user_command = base_command.args(splitted_command);
+        user_command.args(splitted_command);
 
         let mut output = user_command.spawn()?;
         output.wait()?;
@@ -71,27 +161,35 @@ impl LiveCommand {
         format!("{dir_part}{delimiter}")
     }
 
-    fn get_base_process_command(&self, executable: &str) -> Result<process::Command> {
-        // std::fs::metadata(path)
-        // check if first arg exists in current dir or in PATH to see in need to prefix with cmd
+    fn get_base_process_command(&self, executable: &str) -> Result<std::process::Command> {
+        if std::fs::metadata(executable).is_ok() {
+            return Ok(process::Command::new(executable));
+        }
 
-        let _exectuable_metadata = std::fs::metadata(executable)
-            .or_else(|_| {
-                // let executable_as_string = executable.to_string();
-                let path_values = env::var("PATH").map_err(|_| "").unwrap();
+        if RESERVED_CMD_COMMANDS.contains(&executable.to_uppercase().as_str()) {
+            let mut cmd = process::Command::new("cmd");
+            cmd.arg("/c").arg(executable);
+            return Ok(cmd);
+        }
 
-                path_values
-                    .split(";")
-                    .filter_map(|possible_path| {
-                        std::fs::metadata(possible_path.to_string() + executable).ok()
-                    })
-                    .next()
-                    .ok_or(|| "no exectuable in any place in PATH")
-            })
-            .map_err(|_e| anyhow::anyhow!(""));
+        let path_values = env::var("PATH")?;
 
-        todo!("finish implementing")
+        for possible_path in path_values.split(";") {
+            let temp_executable_path = format!("{possible_path}\\{executable}");
+
+            for file_extension in KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS {
+                if std::fs::metadata(format!("{temp_executable_path}{file_extension}")).is_ok() {
+                    return Ok(process::Command::new(temp_executable_path));
+                }
+            }
+        }
+
+        Ok(process::Command::new(executable))
     }
+}
+
+trait CommandExecution {
+    fn execute_command(&self) -> Result<CommandOutcome>;
 }
 
 enum PleaseCommand {
@@ -99,9 +197,15 @@ enum PleaseCommand {
 }
 
 impl PleaseCommand {
-    pub const EXECUTABLE_NAME: &str = "please";
+    const EXECUTABLE_NAME: &str = "please";
 
-    fn handle_please_command(self) -> Result<CommandOutcome> {
+    fn is_please_command(executable: &str) -> bool {
+        executable == Self::EXECUTABLE_NAME
+    }
+}
+
+impl CommandExecution for PleaseCommand {
+    fn execute_command(&self) -> Result<CommandOutcome> {
         match self {
             Self::Exit => Ok(CommandOutcome::Close),
         }
@@ -123,6 +227,36 @@ impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
             _ => Err(anyhow::anyhow!(
                 "unknown please command argument {:?}",
                 value
+            )),
+        }
+    }
+}
+
+enum NativeCommand {
+    Clear,
+}
+
+impl CommandExecution for NativeCommand {
+    fn execute_command(&self) -> Result<CommandOutcome> {
+        match self {
+            NativeCommand::Clear => {
+                let clear_options =
+                    crate::utils::ClearOptions::new(crossterm::terminal::ClearType::Purge);
+                crate::utils::clear_terminal(Some(clear_options))?;
+                Ok(CommandOutcome::Continue)
+            }
+        }
+    }
+}
+
+impl FromStr for NativeCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "clear" => Ok(Self::Clear),
+            _ => Err(anyhow::anyhow!(
+                "string \"{s}\" is not a Please-native command"
             )),
         }
     }

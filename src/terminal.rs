@@ -66,17 +66,14 @@ impl PleaseTerminal {
             return CommandOutcome::Continue;
         };
 
+        let attempted_command = self.live_command.user_command_as_string();
         let command_execution_result = self.live_command.execute_user_command();
 
         let command_outcome = match command_execution_result {
             Ok(CommandOutcome::Close) => return CommandOutcome::Close,
             Ok(command_outcome) => command_outcome,
             Err(e) => {
-                log::error!(
-                    "failed to execute command {}, error: {}",
-                    self.live_command.user_command_as_string(),
-                    e
-                );
+                log::error!("failed to execute command \"{attempted_command}\", error: {e}");
                 CommandOutcome::Continue
             }
         };
