@@ -1,7 +1,7 @@
 use std::env::{self, current_dir};
 use std::io::Write;
 use std::process;
-use std::str::{FromStr, SplitWhitespace};
+use std::str::SplitWhitespace;
 
 use anyhow::{Context, Result};
 
@@ -129,7 +129,9 @@ impl LiveCommand {
         if PleaseCommand::is_please_command(executable) {
             let please_command = PleaseCommand::try_from(splitted_command)?;
             return please_command.execute_command();
-        } else if let Ok(native_command) = NativeCommand::from_str(executable) {
+        } else if let Ok(native_command) =
+            NativeCommand::try_from_executable_and_args(executable, splitted_command.clone())
+        {
             return native_command.execute_command();
         }
 
@@ -234,29 +236,33 @@ impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
 
 enum NativeCommand {
     Clear,
+    Ls(String),
 }
 
 impl CommandExecution for NativeCommand {
     fn execute_command(&self) -> Result<CommandOutcome> {
         match self {
-            NativeCommand::Clear => {
+            Self::Clear => {
                 let clear_options =
                     crate::utils::ClearOptions::new(crossterm::terminal::ClearType::Purge);
                 crate::utils::clear_terminal(Some(clear_options))?;
                 Ok(CommandOutcome::Continue)
             }
+            Self::Ls(_path) => {
+                todo!("implement \"ls\"")
+            }
         }
     }
 }
 
-impl FromStr for NativeCommand {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+impl NativeCommand {
+    fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
+        match executable.to_lowercase().as_str() {
             "clear" => Ok(Self::Clear),
+            "ls" => Ok(Self::Ls(args.collect())),
             _ => Err(anyhow::anyhow!(
-                "string \"{s}\" is not a Please-native command"
+                "unknown native command \"{executable}\" with args {:?}",
+                args
             )),
         }
     }
