@@ -11,9 +11,9 @@ fn main() -> Result<()> {
     utils::init_terminal()?;
 
     let history_config = history::HistoryConfig::default();
-    let _history_object = history::History::from_config(history_config)?;
+    let history_object = history::History::from_config(history_config)?;
 
-    let mut terminal = terminal::PleaseTerminal::new();
+    let mut terminal = terminal::PleaseTerminal::new(history_object);
     terminal.run()?;
 
     Ok(())

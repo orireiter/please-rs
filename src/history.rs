@@ -1,15 +1,15 @@
+use std::collections::VecDeque;
 use std::path::PathBuf;
+use std::{cmp::min, io::Write};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 const DEFAULT_MAX_PERSISTENT_SIZE: isize = 1_000;
-const DEFAULT_MAX_COMMANDS_TO_PERSIST_FROM_CURRENT_SESSION: isize = 500;
 const DEFAULT_PERSISTENT_FILE_NAME: &str = ".please_history";
 
 pub struct HistoryConfig {
     persistent_file: PathBuf,
-    _max_commands_in_persistent_file: isize,
-    _max_commands_to_save_from_cache: isize,
+    max_commands_in_persistent_file: isize,
 }
 
 impl Default for HistoryConfig {
@@ -21,16 +21,14 @@ impl Default for HistoryConfig {
 
         Self {
             persistent_file: home_dir.join(DEFAULT_PERSISTENT_FILE_NAME),
-            _max_commands_in_persistent_file: DEFAULT_MAX_PERSISTENT_SIZE,
-            _max_commands_to_save_from_cache: DEFAULT_MAX_COMMANDS_TO_PERSIST_FROM_CURRENT_SESSION,
+            max_commands_in_persistent_file: DEFAULT_MAX_PERSISTENT_SIZE,
         }
     }
 }
 
 pub struct History {
-    _persistent_history: Vec<String>,
-    _cached_history: Vec<String>,
-    _config: HistoryConfig,
+    cached_history: VecDeque<String>,
+    config: HistoryConfig,
 }
 
 impl History {
@@ -38,18 +36,47 @@ impl History {
         let persistent_commands = get_or_create_persistent_history_file(&config.persistent_file)?;
 
         Ok(Self {
-            _persistent_history: persistent_commands,
-            _cached_history: Vec::new(),
-            _config: config,
+            cached_history: persistent_commands,
+            config,
         })
+    }
+
+    pub fn add_command_to_cache(&mut self, command: String) {
+        self.cached_history.push_front(command);
+    }
+
+    pub fn save_history_to_persistent_file(&self) -> Result<()> {
+        let mut file = std::fs::File::create(&self.config.persistent_file)?;
+
+        let mut command_count = self.cached_history.len();
+        if self.config.max_commands_in_persistent_file.is_positive() {
+            command_count = min(
+                command_count,
+                self.config.max_commands_in_persistent_file as usize,
+            );
+        }
+
+        for index in 0..command_count {
+            let command = &self.cached_history[index];
+            writeln!(file, "{command}").context(format!(
+                "failed to save \"{command}\" to {}",
+                self.config.persistent_file.to_string_lossy()
+            ))?;
+        }
+
+        Ok(())
     }
 }
 
-fn get_or_create_persistent_history_file(file_path: &PathBuf) -> Result<Vec<String>> {
+fn get_or_create_persistent_history_file(file_path: &PathBuf) -> Result<VecDeque<String>> {
     let history_file_content = match std::fs::read_to_string(file_path) {
         Ok(content) => content,
         Err(e) => {
             if matches!(e.kind(), std::io::ErrorKind::NotFound) {
+                log::debug!(
+                    "creating please history file in {}",
+                    file_path.to_string_lossy()
+                );
                 std::fs::File::create(file_path)?;
             }
 

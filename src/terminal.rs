@@ -5,16 +5,21 @@ use crossterm::{
 };
 use std::io::Write;
 
-use crate::commands::{CommandOutcome, LiveCommand};
+use crate::{
+    commands::{CommandOutcome, LiveCommand},
+    history,
+};
 
 pub struct PleaseTerminal {
     live_command: LiveCommand,
+    history: history::History,
 }
 
 impl PleaseTerminal {
-    pub fn new() -> Self {
+    pub fn new(history: history::History) -> Self {
         Self {
             live_command: LiveCommand::new(),
+            history,
         }
     }
 
@@ -36,7 +41,7 @@ impl PleaseTerminal {
                         self.handle_char_added(&mut stdout, c)?;
                     } else if key_event.code.is_enter() {
                         if let CommandOutcome::Close = self.handle_enter_pressed(&mut stdout) {
-                            return Ok(());
+                            break;
                         };
                     } else if key_event.code.is_backspace() {
                         self.handle_backspace(&mut stdout)?
@@ -49,6 +54,10 @@ impl PleaseTerminal {
                 CrosstermTerminalEvent::Resize(_, _) => {}
             }
         }
+
+        self.history.save_history_to_persistent_file()?;
+
+        Ok(())
     }
 
     fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, c: char) -> Result<()> {
@@ -60,13 +69,16 @@ impl PleaseTerminal {
     }
 
     fn handle_enter_pressed(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
+        let attempted_command = self.live_command.user_command_as_string();
+
+        self.history.add_command_to_cache(attempted_command.clone());
+
         println!();
         if let Err(e) = stdout.flush() {
             log::error!("failed to flush newline before executing user command, error: {e}");
             return CommandOutcome::Continue;
         };
 
-        let attempted_command = self.live_command.user_command_as_string();
         let command_execution_result = self.live_command.execute_user_command();
 
         let command_outcome = match command_execution_result {
