@@ -16,7 +16,7 @@ impl Default for HistoryConfig {
     fn default() -> Self {
         let home_dir = match std::env::home_dir() {
             Some(home_dir) => home_dir,
-            None => "~/".into(),
+            None => crate::utils::HOME_DIR.into(),
         };
 
         Self {
@@ -58,7 +58,7 @@ fn get_or_create_persistent_history_file(file_path: &PathBuf) -> Result<Vec<Stri
     };
 
     Ok(history_file_content
-        .split_terminator("\n")
+        .split_terminator(crate::utils::NEWLINE)
         .map(|command_string| command_string.to_string())
         .collect())
 }

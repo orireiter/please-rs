@@ -5,6 +5,7 @@ use std::str::SplitWhitespace;
 
 use anyhow::{Context, Result};
 
+const CMD: &str = "cmd";
 const RESERVED_CMD_COMMANDS: [&str; 83] = [
     "ASSOC",
     "ATTRIB",
@@ -90,8 +91,12 @@ const RESERVED_CMD_COMMANDS: [&str; 83] = [
     "XCOPY",
     "WMIC",
 ];
-
 const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 3] = ["", ".exe", ".bat"];
+
+const PATH_ENV_VAR: &str = "PATH";
+const PATH_ENV_VAR_DELIMITER: &str = ";";
+
+const LIVE_COMMAND_PREFIX_DELIMITER: &str = " -> ";
 
 pub struct LiveCommand {
     pub user_command: Vec<char>,
@@ -114,7 +119,7 @@ impl LiveCommand {
         let command_as_string = self.user_command_as_string();
         self.user_command.clear();
 
-        if command_as_string == "\n" {
+        if command_as_string == crate::utils::NEWLINE {
             return Ok(CommandOutcome::Continue);
         }
 
@@ -158,7 +163,7 @@ impl LiveCommand {
             Err(e) => format!("<error: {e}>"),
         };
 
-        let delimiter = " -> ";
+        let delimiter = LIVE_COMMAND_PREFIX_DELIMITER;
 
         format!("{dir_part}{delimiter}")
     }
@@ -169,14 +174,14 @@ impl LiveCommand {
         }
 
         if RESERVED_CMD_COMMANDS.contains(&executable.to_uppercase().as_str()) {
-            let mut cmd = process::Command::new("cmd");
+            let mut cmd = process::Command::new(CMD);
             cmd.arg("/c").arg(executable);
             return Ok(cmd);
         }
 
-        let path_values = env::var("PATH")?;
+        let path_values = env::var(PATH_ENV_VAR)?;
 
-        for possible_path in path_values.split(";") {
+        for possible_path in path_values.split(PATH_ENV_VAR_DELIMITER) {
             let temp_executable_path = format!("{possible_path}\\{executable}");
 
             for file_extension in KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS {
@@ -200,6 +205,7 @@ enum PleaseCommand {
 
 impl PleaseCommand {
     const EXECUTABLE_NAME: &str = "please";
+    const EXIT: &str = "exit";
 
     fn is_please_command(executable: &str) -> bool {
         executable == Self::EXECUTABLE_NAME
@@ -225,7 +231,7 @@ impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
         };
 
         match main_arg {
-            "exit" => Ok(Self::Exit),
+            Self::EXIT => Ok(Self::Exit),
             _ => Err(anyhow::anyhow!(
                 "unknown please command argument {:?}",
                 value
@@ -256,10 +262,13 @@ impl CommandExecution for NativeCommand {
 }
 
 impl NativeCommand {
+    const CLEAR: &str = "clear";
+    const LS: &str = "ls";
+
     fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
         match executable.to_lowercase().as_str() {
-            "clear" => Ok(Self::Clear),
-            "ls" => Ok(Self::Ls(args.collect())),
+            Self::CLEAR => Ok(Self::Clear),
+            Self::LS => Ok(Self::Ls(args.collect())),
             _ => Err(anyhow::anyhow!(
                 "unknown native command \"{executable}\" with args {:?}",
                 args

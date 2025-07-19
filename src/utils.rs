@@ -3,6 +3,9 @@ use std::io::Write;
 use anyhow::Result;
 use crossterm::{QueueableCommand, cursor, terminal};
 
+pub const NEWLINE: &str = "\n";
+pub const HOME_DIR: &str = "~/";
+
 pub struct ClearOptions {
     clear_type: terminal::ClearType,
 }
