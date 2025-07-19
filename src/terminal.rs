@@ -18,7 +18,7 @@ impl PleaseTerminal {
         }
     }
 
-    pub fn start(mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         let mut stdout = std::io::stdout();
 
         print!("{}", self.live_command.live_command_prefix());

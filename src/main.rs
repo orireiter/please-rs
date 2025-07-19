@@ -8,5 +8,8 @@ fn main() -> Result<()> {
     env_logger::init();
 
     utils::init_terminal()?;
-    terminal::PleaseTerminal::new().start()
+    let mut terminal = terminal::PleaseTerminal::new();
+    terminal.run()?;
+
+    Ok(())
 }
