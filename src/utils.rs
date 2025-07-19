@@ -36,6 +36,7 @@ pub fn clear_terminal(clear_options: Option<ClearOptions>) -> std::io::Result<()
         .queue(cursor::EnableBlinking)?
         .flush()
 }
+
 pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
     clear_terminal(None)?;
