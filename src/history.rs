@@ -29,6 +29,7 @@ impl Default for HistoryConfig {
 pub struct History {
     cached_history: VecDeque<String>,
     config: HistoryConfig,
+    last_stopped_index: usize,
 }
 
 impl History {
@@ -37,6 +38,7 @@ impl History {
 
         Ok(Self {
             cached_history: persistent_commands,
+            last_stopped_index: 0,
             config,
         })
     }
@@ -65,6 +67,25 @@ impl History {
         }
 
         Ok(())
+    }
+
+    pub fn navigate_to_previous(&mut self, pattern: &str) -> Option<&str> {
+        for (index, historical_command) in self.cached_history.iter().enumerate() {
+            if historical_command.starts_with(pattern) {
+                self.last_stopped_index = index;
+                return Some(historical_command);
+            }
+        }
+
+        None
+    }
+
+    pub fn _navigate_to_next(_pattern: String) -> Option<String> {
+        None
+    }
+
+    pub fn reset_history_search_index(&mut self) {
+        self.last_stopped_index = 0
     }
 }
 

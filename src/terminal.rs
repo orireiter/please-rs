@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use crossterm::{
-    QueueableCommand, cursor as crossterm_cursor, event::Event as CrosstermTerminalEvent,
-    terminal as crossterm_terminal,
+    ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
+    event::Event as CrosstermTerminalEvent, terminal as crossterm_terminal,
 };
 use std::io::Write;
 
@@ -37,6 +37,7 @@ impl PleaseTerminal {
                     if !key_event.is_press() {
                         continue;
                     }
+
                     if let Some(c) = as_char {
                         self.handle_char_added(&mut stdout, c)?;
                     } else if key_event.code.is_enter() {
@@ -45,6 +46,8 @@ impl PleaseTerminal {
                         };
                     } else if key_event.code.is_backspace() {
                         self.handle_backspace(&mut stdout)?
+                    } else if key_event.code.is_up() {
+                        self.handle_up_pressed(&mut stdout)?
                     }
                 }
                 CrosstermTerminalEvent::FocusGained => {}
@@ -62,6 +65,9 @@ impl PleaseTerminal {
 
     fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, c: char) -> Result<()> {
         self.live_command.user_command.push(c);
+
+        self.history.reset_history_search_index();
+
         print!("{c}");
         stdout
             .flush()
@@ -103,6 +109,8 @@ impl PleaseTerminal {
             return Ok(());
         }
 
+        self.history.reset_history_search_index();
+
         self.live_command.user_command.pop();
 
         let (x, y) = crossterm_cursor::position()?;
@@ -120,5 +128,28 @@ impl PleaseTerminal {
         }
 
         stdout.flush().context("failed to flush after backspace")
+    }
+
+    fn handle_up_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let current_command_string = self.live_command.user_command_as_string();
+        let previous_fitting_command = self
+            .history
+            .navigate_to_previous(&current_command_string)
+            .map(|previous_command| previous_command.to_string());
+
+        if let Some(previous_fitting_command) = previous_fitting_command
+            && let Some(stripped_command) =
+                previous_fitting_command.strip_prefix(&current_command_string)
+        {
+            stdout.execute(crossterm_cursor::DisableBlinking)?;
+
+            for ch in stripped_command.chars() {
+                self.handle_char_added(stdout, ch)?;
+            }
+
+            stdout.execute(crossterm_cursor::EnableBlinking)?;
+        }
+
+        Ok(())
     }
 }
