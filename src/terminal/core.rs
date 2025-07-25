@@ -105,6 +105,8 @@ impl PleaseTerminal {
         };
 
         let command_execution_result = self.live_command.execute_user_command();
+        self.history_pattern_match_max_index = 0;
+        self.history.reset_history_search_index();
 
         let command_outcome = match command_execution_result {
             Ok(CommandOutcome::Close) => return CommandOutcome::Close,
