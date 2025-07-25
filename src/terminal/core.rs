@@ -51,6 +51,8 @@ impl PleaseTerminal {
                         self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
                     } else if key_event.code.is_up() {
                         self.handle_up_pressed(&mut stdout)?
+                    } else if key_event.code.is_down() {
+                        self.handle_down_pressed(&mut stdout)?
                     }
                 }
                 CrosstermTerminalEvent::FocusGained => {}
@@ -161,12 +163,37 @@ impl PleaseTerminal {
             .navigate_to_previous(&current_command_string[..self.history_pattern_match_max_index])
             .map(|previous_command| previous_command.to_string());
 
-        if let Some(previous_fitting_command) = previous_fitting_command
-            && current_command_string != previous_fitting_command
-        {
+        if let Some(previous_fitting_command) = previous_fitting_command {
+            self.override_current_command(stdout, current_command_string, previous_fitting_command)?
+        }
+
+        Ok(())
+    }
+
+    fn handle_down_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let current_command_string = self.live_command.user_command_as_string();
+        let next_fitting_command = self
+            .history
+            .navigate_to_next(&current_command_string[..self.history_pattern_match_max_index])
+            .map(|previous_command| previous_command.to_string());
+
+        if let Some(next_fitting_command) = next_fitting_command {
+            self.override_current_command(stdout, current_command_string, next_fitting_command)?
+        }
+
+        Ok(())
+    }
+
+    fn override_current_command(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        current_command: String,
+        new_command: String,
+    ) -> Result<()> {
+        if current_command != new_command {
             stdout.execute(crossterm_cursor::DisableBlinking)?;
 
-            let backspace_amount = current_command_string
+            let backspace_amount = current_command
                 .len()
                 .saturating_sub(self.history_pattern_match_max_index);
             let backspace_action =
@@ -175,7 +202,7 @@ impl PleaseTerminal {
                 self.handle_backspace(stdout, &backspace_action)?;
             }
 
-            let left_to_write = &previous_fitting_command[self.history_pattern_match_max_index..];
+            let left_to_write = &new_command[self.history_pattern_match_max_index..];
             for ch in left_to_write.chars() {
                 self.handle_char_added(stdout, Action::new_history_key_pressed_action(ch))?;
             }

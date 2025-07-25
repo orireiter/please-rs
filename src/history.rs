@@ -70,12 +70,18 @@ impl History {
     }
 
     pub fn navigate_to_previous(&mut self, pattern: &str) -> Option<&str> {
+        if self.last_stopped_index >= self.cached_history.len() {
+            return None;
+        }
+
         let history_slice = self.cached_history.range(self.last_stopped_index..);
 
         for (index, historical_command) in history_slice.enumerate() {
             if historical_command.starts_with(pattern) {
                 // adding 1 so next attempt won't match this same command
-                self.last_stopped_index = index + self.last_stopped_index + 1;
+                let new_index = index + self.last_stopped_index + 1;
+
+                self.last_stopped_index = self.cached_history.len().min(new_index);
                 return Some(historical_command);
             }
         }
@@ -83,7 +89,20 @@ impl History {
         None
     }
 
-    pub fn _navigate_to_next(_pattern: String) -> Option<String> {
+    pub fn navigate_to_next(&mut self, pattern: &str) -> Option<&str> {
+        if self.last_stopped_index == 0 {
+            return None;
+        }
+
+        let history_slice = self.cached_history.range(..self.last_stopped_index - 1);
+
+        for (index, historical_command) in history_slice.rev().enumerate() {
+            if historical_command.starts_with(pattern) {
+                self.last_stopped_index = 0.max(self.last_stopped_index - index - 1);
+                return Some(historical_command);
+            }
+        }
+
         None
     }
 
