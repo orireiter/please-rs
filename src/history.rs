@@ -70,9 +70,12 @@ impl History {
     }
 
     pub fn navigate_to_previous(&mut self, pattern: &str) -> Option<&str> {
-        for (index, historical_command) in self.cached_history.iter().enumerate() {
+        let history_slice = self.cached_history.range(self.last_stopped_index..);
+
+        for (index, historical_command) in history_slice.enumerate() {
             if historical_command.starts_with(pattern) {
-                self.last_stopped_index = index;
+                // adding 1 so next attempt won't match this same command
+                self.last_stopped_index = index + self.last_stopped_index + 1;
                 return Some(historical_command);
             }
         }
