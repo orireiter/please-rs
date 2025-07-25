@@ -6,14 +6,14 @@ use std::str::SplitWhitespace;
 use anyhow::{Context, Result};
 
 const CMD: &str = "cmd";
-const RESERVED_CMD_COMMANDS: [&str; 83] = [
+const RESERVED_CMD_COMMANDS: [&str; 82] = [
     "ASSOC",
     "ATTRIB",
     "BREAK",
     "BCDEDIT",
     "CACLS",
     "CALL",
-    "CD",
+    // "CD", commented to substitute with rust fn
     "CHCP",
     "CHDIR",
     "CHKDSK",
@@ -243,6 +243,7 @@ impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
 enum NativeCommand {
     Clear,
     Ls(String),
+    ChangeDir(String),
 }
 
 impl CommandExecution for NativeCommand {
@@ -257,6 +258,10 @@ impl CommandExecution for NativeCommand {
             Self::Ls(_path) => {
                 todo!("implement \"ls\"")
             }
+            Self::ChangeDir(new_dir) => {
+                std::env::set_current_dir(new_dir)?;
+                Ok(CommandOutcome::Continue)
+            }
         }
     }
 }
@@ -264,11 +269,14 @@ impl CommandExecution for NativeCommand {
 impl NativeCommand {
     const CLEAR: &str = "clear";
     const LS: &str = "ls";
+    const CD: &str = "cd";
+    const CHDIR: &str = "chdir";
 
     fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
         match executable.to_lowercase().as_str() {
             Self::CLEAR => Ok(Self::Clear),
             Self::LS => Ok(Self::Ls(args.collect())),
+            Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
             _ => Err(anyhow::anyhow!(
                 "unknown native command \"{executable}\" with args {:?}",
                 args
