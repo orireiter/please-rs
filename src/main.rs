@@ -1,4 +1,5 @@
 mod commands;
+mod history;
 mod terminal;
 mod utils;
 
@@ -8,5 +9,12 @@ fn main() -> Result<()> {
     env_logger::init();
 
     utils::init_terminal()?;
-    terminal::PleaseTerminal::new().start()
+
+    let history_config = history::HistoryConfig::default();
+    let history_object = history::History::from_config(history_config)?;
+
+    let mut terminal = terminal::PleaseTerminal::new(history_object);
+    terminal.run()?;
+
+    Ok(())
 }
