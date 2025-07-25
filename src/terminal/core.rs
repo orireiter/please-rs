@@ -1,11 +1,12 @@
-use crate::terminal::Action;
 use anyhow::{Context, Result};
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
-    event::Event as CrosstermTerminalEvent, terminal as crossterm_terminal,
+    event::{Event as CrosstermTerminalEvent, KeyCode as CrosstermTerminalKeyCode},
+    terminal as crossterm_terminal,
 };
 use std::io::Write;
 
+use crate::terminal::{Action, ActionType};
 use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
@@ -14,6 +15,7 @@ use crate::{
 pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
+    history_pattern_match_max_index: usize,
 }
 
 impl PleaseTerminal {
@@ -21,6 +23,7 @@ impl PleaseTerminal {
         Self {
             live_command: LiveCommand::new(),
             history,
+            history_pattern_match_max_index: 0,
         }
     }
 
@@ -45,7 +48,7 @@ impl PleaseTerminal {
                             break;
                         };
                     } else if key_event.code.is_backspace() {
-                        self.handle_backspace(&mut stdout)?
+                        self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
                     } else if key_event.code.is_up() {
                         self.handle_up_pressed(&mut stdout)?
                     }
@@ -79,8 +82,10 @@ impl PleaseTerminal {
         };
 
         self.live_command.user_command.push(c);
-
-        self.history.reset_history_search_index();
+        if let ActionType::UserAction = action.action_type {
+            self.history_pattern_match_max_index = self.live_command.user_command.len();
+            self.history.reset_history_search_index();
+        }
 
         print!("{c}");
         stdout
@@ -118,14 +123,16 @@ impl PleaseTerminal {
         command_outcome
     }
 
-    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout, action: &Action) -> Result<()> {
         if self.live_command.user_command.is_empty() {
             return Ok(());
         }
 
-        self.history.reset_history_search_index();
-
         self.live_command.user_command.pop();
+        if let ActionType::UserAction = action.action_type {
+            self.history_pattern_match_max_index = self.live_command.user_command.len();
+            self.history.reset_history_search_index();
+        }
 
         let (x, y) = crossterm_cursor::position()?;
         if x == 0 && y == 0 {
@@ -144,20 +151,30 @@ impl PleaseTerminal {
         stdout.flush().context("failed to flush after backspace")
     }
 
+    // todo optimize and not backspace everything just to re-write
     fn handle_up_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         let current_command_string = self.live_command.user_command_as_string();
         let previous_fitting_command = self
             .history
-            .navigate_to_previous(&current_command_string)
+            .navigate_to_previous(&current_command_string[..self.history_pattern_match_max_index])
             .map(|previous_command| previous_command.to_string());
 
         if let Some(previous_fitting_command) = previous_fitting_command
-            && let Some(stripped_command) =
-                previous_fitting_command.strip_prefix(&current_command_string)
+            && current_command_string != previous_fitting_command
         {
             stdout.execute(crossterm_cursor::DisableBlinking)?;
 
-            for ch in stripped_command.chars() {
+            let backspace_amount = current_command_string
+                .len()
+                .saturating_sub(self.history_pattern_match_max_index);
+            let backspace_action =
+                Action::new_history_action_by_key_code(CrosstermTerminalKeyCode::Backspace);
+            for _ in 0..backspace_amount {
+                self.handle_backspace(stdout, &backspace_action)?;
+            }
+
+            let left_to_write = &previous_fitting_command[self.history_pattern_match_max_index..];
+            for ch in left_to_write.chars() {
                 self.handle_char_added(stdout, Action::new_history_key_pressed_action(ch))?;
             }
 
