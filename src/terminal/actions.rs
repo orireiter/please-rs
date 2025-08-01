@@ -3,7 +3,7 @@ use crossterm::event::{
 };
 
 pub enum ActionType {
-    UserAction,
+    _UserAction,
     HistoryAction,
 }
 
@@ -13,9 +13,9 @@ pub struct Action {
 }
 
 impl Action {
-    pub fn new_user_action(event: CrosstermEvent) -> Self {
+    pub fn _new_user_action(event: CrosstermEvent) -> Self {
         Self {
-            action_type: ActionType::UserAction,
+            action_type: ActionType::_UserAction,
             event,
         }
     }

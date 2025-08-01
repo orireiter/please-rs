@@ -46,18 +46,24 @@ impl PleaseTerminal {
                         continue;
                     }
 
-                    if key_event.code.as_char().is_some() {
-                        self.handle_char_added(&mut stdout, Action::new_user_action(event))?;
+                    if let Some(new_char) = key_event.code.as_char() {
+                        self.handle_char_added_v2(&mut stdout, new_char)?;
+                        // self.handle_char_added(&mut stdout, Action::new_user_action(event))?;
                     } else if key_event.code.is_enter() {
                         if let CommandOutcome::Close = self.handle_enter_pressed(&mut stdout) {
                             break;
                         };
                     } else if key_event.code.is_backspace() {
-                        self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
+                        self.handle_backspace_v2(&mut stdout)?;
+                        // self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
                     } else if key_event.code.is_up() {
                         self.handle_up_pressed(&mut stdout)?
                     } else if key_event.code.is_down() {
                         self.handle_down_pressed(&mut stdout)?
+                    } else if key_event.code.is_left() {
+                        self.move_cursor_left(&mut stdout, 1)?;
+                    } else if key_event.code.is_right() {
+                        self.move_cursor_right(&mut stdout, 1)?;
                     }
                 }
                 CrosstermTerminalEvent::FocusGained => {}
@@ -89,7 +95,7 @@ impl PleaseTerminal {
         };
 
         self.live_command.user_command.push(c);
-        if let ActionType::UserAction = action.action_type {
+        if let ActionType::_UserAction = action.action_type {
             self.history_pattern_match_max_index = self.live_command.user_command.len();
             self.history.reset_history_search_index();
         }
@@ -112,6 +118,8 @@ impl PleaseTerminal {
         };
 
         let command_execution_result = self.live_command.execute_user_command();
+
+        self.cursor_position = 0;
         self.history_pattern_match_max_index = 0;
         self.history.reset_history_search_index();
 
@@ -138,7 +146,7 @@ impl PleaseTerminal {
         }
 
         self.live_command.user_command.pop();
-        if let ActionType::UserAction = action.action_type {
+        if let ActionType::_UserAction = action.action_type {
             self.history_pattern_match_max_index = self.live_command.user_command.len();
             self.history.reset_history_search_index();
         }
@@ -219,7 +227,6 @@ impl PleaseTerminal {
     }
 }
 
-#[allow(dead_code)]
 impl PleaseTerminal {
     fn handle_char_added_v2(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
         self.live_command
