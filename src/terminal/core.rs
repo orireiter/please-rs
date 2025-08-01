@@ -16,6 +16,9 @@ pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
     history_pattern_match_max_index: usize,
+
+    cursor_position: usize,
+    _history_pattern_position: usize,
 }
 
 impl PleaseTerminal {
@@ -24,6 +27,8 @@ impl PleaseTerminal {
             live_command: LiveCommand::new(),
             history,
             history_pattern_match_max_index: 0,
+            cursor_position: 0,
+            _history_pattern_position: 0,
         }
     }
 
@@ -208,6 +213,117 @@ impl PleaseTerminal {
             }
 
             stdout.execute(crossterm_cursor::EnableBlinking)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+impl PleaseTerminal {
+    fn handle_char_added_v2(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
+        self.live_command
+            .user_command
+            .insert(self.cursor_position, new_char);
+
+        stdout.execute(crossterm_cursor::DisableBlinking)?;
+        self.write_command_suffix(stdout)?;
+        stdout.execute(crossterm_cursor::EnableBlinking)?;
+
+        // self.history_pattern_position = self.live_command.user_command.len();
+        // self.history.reset_history_search_index();
+        Ok(())
+    }
+
+    fn handle_backspace_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        if self.cursor_position == 0 || self.live_command.user_command.is_empty() {
+            return Ok(());
+        }
+
+        stdout.execute(crossterm_cursor::DisableBlinking)?;
+
+        self.live_command
+            .user_command
+            .remove(self.cursor_position.saturating_sub(1));
+
+        self.move_cursor_left(stdout, 1)?;
+        print!(" ");
+        self.cursor_position += 1;
+        self.move_cursor_left(stdout, 1)?;
+
+        // not sure why but if the backspace is not from at the end, we need an extra backspace
+        let early_position = self.cursor_position;
+
+        self.write_command_suffix(stdout)?;
+
+        if early_position != self.live_command.user_command.len() {
+            self.move_cursor_left(stdout, 1)?;
+        }
+
+        stdout.execute(crossterm_cursor::EnableBlinking)?;
+
+        Ok(())
+    }
+
+    fn write_command_suffix(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let suffix = &self.live_command.user_command_as_string()[self.cursor_position..];
+        if suffix.is_empty() {
+            return Ok(());
+        }
+
+        print!("{suffix}");
+        stdout.flush()?;
+
+        if self.cursor_position + 1 != self.live_command.user_command.len() {
+            stdout.execute(crossterm_terminal::Clear(
+                crossterm_terminal::ClearType::FromCursorDown,
+            ))?;
+        }
+
+        // since the print sends the actual cursor to the end, we rewind it
+        self.cursor_position = self.live_command.user_command.len();
+        let left_steps = suffix.len().saturating_sub(1);
+        self.move_cursor_left(stdout, left_steps)?;
+
+        Ok(())
+    }
+
+    fn move_cursor_right(&mut self, stdout: &mut std::io::Stdout, steps: usize) -> Result<()> {
+        for _ in 0..steps {
+            if self.cursor_position == self.live_command.user_command.len() {
+                break;
+            }
+
+            let (x, y) = crossterm_cursor::position()?;
+            let terminal_size = crossterm_terminal::size()?;
+            if x + 1 < terminal_size.0 {
+                stdout.execute(crossterm_cursor::MoveRight(1))?;
+            } else {
+                stdout.execute(crossterm_cursor::MoveTo(0, y + 1))?;
+            }
+
+            self.cursor_position += 1;
+        }
+
+        Ok(())
+    }
+
+    fn move_cursor_left(&mut self, stdout: &mut std::io::Stdout, steps: usize) -> Result<()> {
+        for _ in 0..steps {
+            if self.cursor_position == 0 {
+                break;
+            }
+
+            let (x, y) = crossterm_cursor::position()?;
+            if x == 0 && y == 0 {
+                break;
+            } else if x > 0 {
+                stdout.execute(crossterm_cursor::MoveLeft(1))?;
+            } else {
+                let terminal_size = crossterm_terminal::size()?;
+                stdout.execute(crossterm_cursor::MoveTo(terminal_size.0, y - 1))?;
+            }
+            self.cursor_position = self.cursor_position.saturating_sub(1);
         }
 
         Ok(())
