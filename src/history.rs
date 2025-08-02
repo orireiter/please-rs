@@ -7,6 +7,11 @@ use anyhow::{Context, Result};
 const DEFAULT_MAX_PERSISTENT_SIZE: isize = 1_000;
 const DEFAULT_PERSISTENT_FILE_NAME: &str = ".please_history";
 
+pub enum Direction {
+    Previous,
+    Next,
+}
+
 pub struct HistoryConfig {
     persistent_file: PathBuf,
     max_commands_in_persistent_file: isize,

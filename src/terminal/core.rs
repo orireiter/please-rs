@@ -18,7 +18,7 @@ pub struct PleaseTerminal {
     history_pattern_match_max_index: usize,
 
     cursor_position: usize,
-    _history_pattern_position: usize,
+    history_pattern_position: usize,
 }
 
 impl PleaseTerminal {
@@ -28,7 +28,7 @@ impl PleaseTerminal {
             history,
             history_pattern_match_max_index: 0,
             cursor_position: 0,
-            _history_pattern_position: 0,
+            history_pattern_position: 0,
         }
     }
 
@@ -118,6 +118,7 @@ impl PleaseTerminal {
         let command_execution_result = self.live_command.execute_user_command();
 
         self.cursor_position = 0;
+        self.history_pattern_position = 0;
         self.history_pattern_match_max_index = 0;
         self.history.reset_history_search_index();
 
@@ -232,6 +233,7 @@ impl PleaseTerminal {
     }
 }
 
+#[allow(dead_code)]
 impl PleaseTerminal {
     fn handle_char_added_v2(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
         self.live_command
@@ -242,8 +244,8 @@ impl PleaseTerminal {
         self.write_command_suffix(stdout)?;
         stdout.execute(crossterm_cursor::EnableBlinking)?;
 
-        // self.history_pattern_position = self.live_command.user_command.len();
-        // self.history.reset_history_search_index();
+        self.history_pattern_position = self.cursor_position;
+        self.history.reset_history_search_index();
         Ok(())
     }
 
@@ -271,6 +273,9 @@ impl PleaseTerminal {
         if early_position != self.live_command.user_command.len() {
             self.move_cursor_left(stdout, 1)?;
         }
+
+        self.history_pattern_position = self.cursor_position;
+        self.history.reset_history_search_index();
 
         stdout.execute(crossterm_cursor::EnableBlinking)?;
 
@@ -336,6 +341,57 @@ impl PleaseTerminal {
                 stdout.execute(crossterm_cursor::MoveTo(terminal_size.0, y - 1))?;
             }
             self.cursor_position = self.cursor_position.saturating_sub(1);
+        }
+
+        Ok(())
+    }
+
+    fn handle_up_pressed_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.handle_history_search(stdout, history::Direction::Previous)
+    }
+
+    fn handle_down_pressed_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.handle_history_search(stdout, history::Direction::Next)
+    }
+
+    fn handle_history_search(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        direction: history::Direction,
+    ) -> Result<()> {
+        let current_command_string = self.live_command.user_command_as_string();
+        let current_history_pattern = &current_command_string[..self.history_pattern_position];
+
+        let historical_command_option = match direction {
+            history::Direction::Previous => {
+                self.history.navigate_to_previous(current_history_pattern)
+            }
+            history::Direction::Next => self.history.navigate_to_next(current_history_pattern),
+        };
+
+        let fitting_command =
+            historical_command_option.map(|previous_command| previous_command.to_string());
+
+        if let Some(fitting_command) = fitting_command {
+            self.live_command.user_command = fitting_command.chars().collect();
+
+            stdout.execute(crossterm_cursor::DisableBlinking)?;
+            self.move_cursor_left(
+                stdout,
+                current_command_string
+                    .len()
+                    .saturating_sub(current_history_pattern.len()),
+            )?;
+            self.write_command_suffix(stdout)?;
+            self.move_cursor_right(
+                stdout,
+                self.live_command
+                    .user_command
+                    .len()
+                    .saturating_sub(self.cursor_position),
+            )?;
+
+            stdout.execute(crossterm_cursor::EnableBlinking)?;
         }
 
         Ok(())
