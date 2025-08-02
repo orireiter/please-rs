@@ -109,8 +109,6 @@ impl PleaseTerminal {
     fn handle_enter_pressed(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
         let attempted_command = self.live_command.user_command_as_string();
 
-        self.history.add_command_to_cache(attempted_command.clone());
-
         println!();
         if let Err(e) = stdout.flush() {
             log::error!("failed to flush newline before executing user command, error: {e}");
@@ -124,13 +122,20 @@ impl PleaseTerminal {
         self.history.reset_history_search_index();
 
         let command_outcome = match command_execution_result {
-            Ok(CommandOutcome::Close) => return CommandOutcome::Close,
+            Ok(CommandOutcome::Close) => {
+                self.history.add_command_to_cache(attempted_command);
+                return CommandOutcome::Close;
+            }
             Ok(command_outcome) => command_outcome,
             Err(e) => {
                 log::error!("failed to execute command \"{attempted_command}\", error: {e}");
                 CommandOutcome::Continue
             }
         };
+
+        if !matches!(command_outcome, CommandOutcome::Skip) {
+            self.history.add_command_to_cache(attempted_command);
+        }
 
         print!("{}", self.live_command.live_command_prefix());
         if let Err(e) = stdout.flush() {

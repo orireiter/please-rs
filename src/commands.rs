@@ -113,7 +113,7 @@ impl LiveCommand {
         let mut stdout = std::io::stdout();
 
         if self.user_command.is_empty() {
-            return Ok(CommandOutcome::Continue);
+            return Ok(CommandOutcome::Skip);
         }
 
         let command_as_string = self.user_command_as_string();
@@ -288,4 +288,5 @@ impl NativeCommand {
 pub enum CommandOutcome {
     Continue,
     Close,
+    Skip,
 }
