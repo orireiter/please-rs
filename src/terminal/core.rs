@@ -43,19 +43,17 @@ impl PleaseTerminal {
                     }
 
                     if let Some(new_char) = key_event.code.as_char() {
-                        self.handle_char_added_v2(&mut stdout, new_char)?;
-                        // self.handle_char_added(&mut stdout, Action::new_user_action(event))?;
+                        self.handle_char_added(&mut stdout, new_char)?;
                     } else if key_event.code.is_enter() {
                         if let CommandOutcome::Close = self.handle_enter_pressed(&mut stdout) {
                             break;
                         };
                     } else if key_event.code.is_backspace() {
-                        self.handle_backspace_v2(&mut stdout)?;
-                        // self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
+                        self.handle_backspace(&mut stdout)?;
                     } else if key_event.code.is_up() {
-                        self.handle_up_pressed_v2(&mut stdout)?
+                        self.handle_up_pressed(&mut stdout)?
                     } else if key_event.code.is_down() {
-                        self.handle_down_pressed_v2(&mut stdout)?
+                        self.handle_down_pressed(&mut stdout)?
                     } else if key_event.code.is_left() {
                         self.move_cursor_left(&mut stdout, 1)?;
                     } else if key_event.code.is_right() {
@@ -113,10 +111,8 @@ impl PleaseTerminal {
 
         command_outcome
     }
-}
 
-impl PleaseTerminal {
-    fn handle_char_added_v2(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
+    fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
         self.live_command
             .user_command
             .insert(self.cursor_position, new_char);
@@ -130,7 +126,7 @@ impl PleaseTerminal {
         Ok(())
     }
 
-    fn handle_backspace_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.cursor_position == 0 || self.live_command.user_command.is_empty() {
             return Ok(());
         }
@@ -227,11 +223,11 @@ impl PleaseTerminal {
         Ok(())
     }
 
-    fn handle_up_pressed_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_up_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         self.handle_history_search(stdout, history::Direction::Previous)
     }
 
-    fn handle_down_pressed_v2(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_down_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         self.handle_history_search(stdout, history::Direction::Next)
     }
 
