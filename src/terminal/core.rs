@@ -1,12 +1,10 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossterm::{
-    ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
-    event::{Event as CrosstermTerminalEvent, KeyCode as CrosstermTerminalKeyCode},
+    ExecutableCommand, cursor as crossterm_cursor, event::Event as CrosstermTerminalEvent,
     terminal as crossterm_terminal,
 };
 use std::io::Write;
 
-use crate::terminal::{Action, ActionType};
 use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
@@ -15,7 +13,6 @@ use crate::{
 pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
-    history_pattern_match_max_index: usize,
 
     cursor_position: usize,
     history_pattern_position: usize,
@@ -26,7 +23,6 @@ impl PleaseTerminal {
         Self {
             live_command: LiveCommand::new(),
             history,
-            history_pattern_match_max_index: 0,
             cursor_position: 0,
             history_pattern_position: 0,
         }
@@ -57,9 +53,9 @@ impl PleaseTerminal {
                         self.handle_backspace_v2(&mut stdout)?;
                         // self.handle_backspace(&mut stdout, &Action::new_user_action(event))?
                     } else if key_event.code.is_up() {
-                        self.handle_up_pressed(&mut stdout)?
+                        self.handle_up_pressed_v2(&mut stdout)?
                     } else if key_event.code.is_down() {
-                        self.handle_down_pressed(&mut stdout)?
+                        self.handle_down_pressed_v2(&mut stdout)?
                     } else if key_event.code.is_left() {
                         self.move_cursor_left(&mut stdout, 1)?;
                     } else if key_event.code.is_right() {
@@ -79,33 +75,6 @@ impl PleaseTerminal {
         Ok(())
     }
 
-    fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, action: Action) -> Result<()> {
-        let CrosstermTerminalEvent::Key(key_event) = action.event else {
-            return Err(anyhow::anyhow!(
-                "handle char function got non-key event {:?}",
-                action.event
-            ));
-        };
-
-        let Some(c) = key_event.code.as_char() else {
-            return Err(anyhow::anyhow!(
-                "handle char function got non-char key event {:?}",
-                key_event.code
-            ));
-        };
-
-        self.live_command.user_command.push(c);
-        if let ActionType::_UserAction = action.action_type {
-            self.history_pattern_match_max_index = self.live_command.user_command.len();
-            self.history.reset_history_search_index();
-        }
-
-        print!("{c}");
-        stdout
-            .flush()
-            .context(format!("failed to flush after adding char {c}"))
-    }
-
     fn handle_enter_pressed(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
         let attempted_command = self.live_command.user_command_as_string();
 
@@ -119,7 +88,6 @@ impl PleaseTerminal {
 
         self.cursor_position = 0;
         self.history_pattern_position = 0;
-        self.history_pattern_match_max_index = 0;
         self.history.reset_history_search_index();
 
         let command_outcome = match command_execution_result {
@@ -145,95 +113,8 @@ impl PleaseTerminal {
 
         command_outcome
     }
-
-    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout, action: &Action) -> Result<()> {
-        if self.live_command.user_command.is_empty() {
-            return Ok(());
-        }
-
-        self.live_command.user_command.pop();
-        if let ActionType::_UserAction = action.action_type {
-            self.history_pattern_match_max_index = self.live_command.user_command.len();
-            self.history.reset_history_search_index();
-        }
-
-        let (x, y) = crossterm_cursor::position()?;
-        if x == 0 && y == 0 {
-            return Ok(());
-        } else if x > 0 {
-            stdout.queue(crossterm_cursor::MoveLeft(1))?;
-            print!(" ");
-            stdout.queue(crossterm_cursor::MoveLeft(1))?;
-        } else {
-            let terminal_size = crossterm_terminal::size()?;
-            stdout.queue(crossterm_cursor::MoveTo(terminal_size.0, y - 1))?;
-            print!(" ");
-            stdout.queue(crossterm_cursor::MoveTo(terminal_size.0, y - 1))?;
-        }
-
-        stdout.flush().context("failed to flush after backspace")
-    }
-
-    // todo optimize and not backspace everything just to re-write
-    fn handle_up_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let current_command_string = self.live_command.user_command_as_string();
-        let previous_fitting_command = self
-            .history
-            .navigate_to_previous(&current_command_string[..self.history_pattern_match_max_index])
-            .map(|previous_command| previous_command.to_string());
-
-        if let Some(previous_fitting_command) = previous_fitting_command {
-            self.override_current_command(stdout, current_command_string, previous_fitting_command)?
-        }
-
-        Ok(())
-    }
-
-    fn handle_down_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let current_command_string = self.live_command.user_command_as_string();
-        let next_fitting_command = self
-            .history
-            .navigate_to_next(&current_command_string[..self.history_pattern_match_max_index])
-            .map(|previous_command| previous_command.to_string());
-
-        if let Some(next_fitting_command) = next_fitting_command {
-            self.override_current_command(stdout, current_command_string, next_fitting_command)?
-        }
-
-        Ok(())
-    }
-
-    fn override_current_command(
-        &mut self,
-        stdout: &mut std::io::Stdout,
-        current_command: String,
-        new_command: String,
-    ) -> Result<()> {
-        if current_command != new_command {
-            stdout.execute(crossterm_cursor::DisableBlinking)?;
-
-            let backspace_amount = current_command
-                .len()
-                .saturating_sub(self.history_pattern_match_max_index);
-            let backspace_action =
-                Action::new_history_action_by_key_code(CrosstermTerminalKeyCode::Backspace);
-            for _ in 0..backspace_amount {
-                self.handle_backspace(stdout, &backspace_action)?;
-            }
-
-            let left_to_write = &new_command[self.history_pattern_match_max_index..];
-            for ch in left_to_write.chars() {
-                self.handle_char_added(stdout, Action::new_history_key_pressed_action(ch))?;
-            }
-
-            stdout.execute(crossterm_cursor::EnableBlinking)?;
-        }
-
-        Ok(())
-    }
 }
 
-#[allow(dead_code)]
 impl PleaseTerminal {
     fn handle_char_added_v2(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
         self.live_command
