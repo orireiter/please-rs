@@ -34,7 +34,7 @@ impl Default for HistoryConfig {
 pub struct History {
     cached_history: VecDeque<String>,
     config: HistoryConfig,
-    last_stopped_index: usize,
+    last_stopped_index: Option<usize>,
 }
 
 impl History {
@@ -43,7 +43,7 @@ impl History {
 
         Ok(Self {
             cached_history: persistent_commands,
-            last_stopped_index: 0,
+            last_stopped_index: None,
             config,
         })
     }
@@ -75,18 +75,29 @@ impl History {
     }
 
     pub fn navigate_to_previous(&mut self, pattern: &str) -> Option<&str> {
-        if self.last_stopped_index >= self.cached_history.len() {
+        if let Some(last_stopped_index) = self.last_stopped_index
+            && last_stopped_index >= self.cached_history.len()
+        {
             return None;
         }
 
-        let history_slice = self.cached_history.range(self.last_stopped_index..);
+        let history_slice = self
+            .cached_history
+            .range(self.last_stopped_index.unwrap_or_default()..);
+
+        let current_historical_command = if let Some(last_stopped_index) = self.last_stopped_index {
+            &self.cached_history[last_stopped_index]
+        } else {
+            ""
+        };
 
         for (index, historical_command) in history_slice.enumerate() {
-            if historical_command.starts_with(pattern) {
-                // adding 1 so next attempt won't match this same command
-                let new_index = index + self.last_stopped_index + 1;
+            if historical_command.starts_with(pattern)
+                && current_historical_command.ne(historical_command)
+            {
+                let new_index = index + self.last_stopped_index.unwrap_or_default();
 
-                self.last_stopped_index = self.cached_history.len().min(new_index);
+                self.last_stopped_index = Some(self.cached_history.len().min(new_index));
                 return Some(historical_command);
             }
         }
@@ -95,15 +106,21 @@ impl History {
     }
 
     pub fn navigate_to_next(&mut self, pattern: &str) -> Option<&str> {
-        if self.last_stopped_index == 0 {
+        // todo!("make sure this works!");
+        let last_stopped_index = self.last_stopped_index?;
+
+        if last_stopped_index == 0 {
             return None;
         }
 
-        let history_slice = self.cached_history.range(..self.last_stopped_index - 1);
+        let history_slice = self.cached_history.range(..last_stopped_index);
 
+        let current_historical_command = &self.cached_history[last_stopped_index];
         for (index, historical_command) in history_slice.rev().enumerate() {
-            if historical_command.starts_with(pattern) {
-                self.last_stopped_index = 0.max(self.last_stopped_index - index - 1);
+            if historical_command.starts_with(pattern)
+                && current_historical_command.ne(historical_command)
+            {
+                self.last_stopped_index = Some(0.max(last_stopped_index - index - 1));
                 return Some(historical_command);
             }
         }
@@ -112,7 +129,7 @@ impl History {
     }
 
     pub fn reset_history_search_index(&mut self) {
-        self.last_stopped_index = 0
+        self.last_stopped_index = None
     }
 }
 
