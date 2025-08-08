@@ -102,6 +102,7 @@ impl History {
             }
         }
 
+        self.last_stopped_index = Some(self.cached_history.len().saturating_sub(1));
         None
     }
 
@@ -125,6 +126,7 @@ impl History {
             }
         }
 
+        self.last_stopped_index = None;
         None
     }
 
