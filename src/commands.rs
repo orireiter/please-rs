@@ -95,6 +95,7 @@ const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 3] = ["", ".exe", ".bat"];
 
 const PATH_ENV_VAR: &str = "PATH";
 const PATH_ENV_VAR_DELIMITER: &str = ";";
+const QUOTES: [&str; 2] = ["\"", "'"];
 
 const LIVE_COMMAND_PREFIX_DELIMITER: &str = " -> ";
 
@@ -144,7 +145,8 @@ impl LiveCommand {
             "failed to build base command for {executable} with {splitted_command:?}"
         ))?;
 
-        user_command.args(splitted_command);
+        let args = self.get_process_args(splitted_command);
+        user_command.args(args);
 
         crossterm::terminal::disable_raw_mode()?;
 
@@ -196,6 +198,41 @@ impl LiveCommand {
         }
 
         Ok(process::Command::new(executable))
+    }
+
+    fn get_process_args(&self, split_string: SplitWhitespace) -> Vec<String> {
+        let mut args = Vec::new();
+
+        let mut quotes_used = None;
+        let mut current_arg = String::new();
+        for arg in split_string {
+            if let Some(o) = QUOTES.iter().find(|q| arg.starts_with(*q))
+                && quotes_used.is_none()
+            {
+                quotes_used = Some(*o);
+            }
+
+            if let Some(q) = quotes_used {
+                let prefix = if current_arg.is_empty() { "" } else { " " };
+
+                current_arg.push_str(prefix);
+                current_arg.push_str(arg);
+                if arg.ends_with(q) {
+                    let to_push = current_arg
+                        .strip_prefix(q)
+                        .and_then(|a| a.strip_suffix(q))
+                        .unwrap_or(&current_arg);
+
+                    args.push(to_push.to_string());
+                    current_arg.clear();
+                    quotes_used = None;
+                }
+            } else {
+                args.push(arg.to_string());
+            }
+        }
+
+        args
     }
 }
 
