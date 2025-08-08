@@ -95,6 +95,7 @@ const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 3] = ["", ".exe", ".bat"];
 
 const PATH_ENV_VAR: &str = "PATH";
 const PATH_ENV_VAR_DELIMITER: &str = ";";
+const QUOTES: [&str; 2] = ["\"", "'"];
 
 const LIVE_COMMAND_PREFIX_DELIMITER: &str = " -> ";
 
@@ -202,16 +203,24 @@ impl LiveCommand {
     fn get_process_args(&self, split_string: SplitWhitespace) -> Vec<String> {
         let mut args = Vec::new();
 
+        let mut quotes_used = None;
         let mut current_arg = String::new();
         for arg in split_string {
-            if current_arg.starts_with("\"") || arg.starts_with("\"") {
+            if let Some(o) = QUOTES.iter().find(|q| arg.starts_with(*q))
+                && quotes_used.is_none()
+            {
+                quotes_used = Some(*o);
+            }
+
+            if let Some(q) = quotes_used {
                 let prefix = if current_arg.is_empty() { "" } else { " " };
 
                 current_arg.push_str(prefix);
                 current_arg.push_str(arg);
-                if arg.ends_with("\"") {
+                if arg.ends_with(q) {
                     args.push(current_arg.clone());
                     current_arg.clear();
+                    quotes_used = None;
                 }
             } else {
                 args.push(arg.to_string());
