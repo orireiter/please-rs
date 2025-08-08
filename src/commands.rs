@@ -146,9 +146,13 @@ impl LiveCommand {
 
         user_command.args(splitted_command);
 
+        crossterm::terminal::disable_raw_mode()?;
+
         let mut output = user_command.spawn()?;
         output.wait()?;
         stdout.flush()?;
+
+        crossterm::terminal::enable_raw_mode()?;
 
         Ok(CommandOutcome::Continue)
     }
