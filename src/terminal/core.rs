@@ -161,18 +161,14 @@ impl PleaseTerminal {
 
     fn write_command_suffix(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         let suffix = &self.live_command.user_command_as_string()[self.cursor_position..];
-        if suffix.is_empty() {
-            return Ok(());
+        if !suffix.is_empty() {
+            print!("{suffix}");
+            stdout.flush()?;
         }
 
-        print!("{suffix}");
-        stdout.flush()?;
-
-        if self.cursor_position + 1 != self.live_command.user_command.len() {
-            stdout.execute(crossterm_terminal::Clear(
-                crossterm_terminal::ClearType::FromCursorDown,
-            ))?;
-        }
+        stdout.execute(crossterm_terminal::Clear(
+            crossterm_terminal::ClearType::FromCursorDown,
+        ))?;
 
         // since the print sends the actual cursor to the end, we rewind it
         self.cursor_position = self.live_command.user_command.len();
@@ -239,17 +235,9 @@ impl PleaseTerminal {
         let current_command_string = self.live_command.user_command_as_string();
         let current_history_pattern = &current_command_string[..self.history_pattern_position];
 
-        let historical_command_option = match direction {
-            history::Direction::Previous => {
-                self.history.navigate_to_previous(current_history_pattern)
-            }
-            history::Direction::Next => self.history.navigate_to_next(current_history_pattern),
-        };
+        let new_command = self.get_new_command_from_history(direction, current_history_pattern);
 
-        let fitting_command =
-            historical_command_option.map(|previous_command| previous_command.to_string());
-
-        if let Some(fitting_command) = fitting_command {
+        if let Some(fitting_command) = new_command {
             self.live_command.user_command = fitting_command.chars().collect();
 
             stdout.execute(crossterm_cursor::DisableBlinking)?;
@@ -271,6 +259,32 @@ impl PleaseTerminal {
             stdout.execute(crossterm_cursor::EnableBlinking)?;
         }
 
+        stdout.execute(crossterm_cursor::EnableBlinking)?;
+
         Ok(())
+    }
+
+    fn get_new_command_from_history(
+        &mut self,
+        direction: history::Direction,
+        current_history_pattern: &str,
+    ) -> Option<String> {
+        let historical_command_option = match direction {
+            history::Direction::Previous => {
+                self.history.navigate_to_previous(current_history_pattern)
+            }
+            history::Direction::Next => self.history.navigate_to_next(current_history_pattern),
+        };
+
+        let fitting_command =
+            historical_command_option.map(|previous_command| previous_command.to_string());
+
+        if let Some(fitting_command) = fitting_command {
+            Some(fitting_command)
+        } else if self.cursor_position != self.history_pattern_position {
+            Some(current_history_pattern.to_string())
+        } else {
+            None
+        }
     }
 }
