@@ -14,3 +14,4 @@
 8. Support quick clear of command with `ctrl+c`
 9. Handle copy+pasting
 10. Add git visual support if not part of omz plugin support.
+11. Add installation support to make usage easier
