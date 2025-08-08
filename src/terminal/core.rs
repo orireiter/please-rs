@@ -187,10 +187,7 @@ impl PleaseTerminal {
                         continue;
                     }
 
-                    let key_char = key_event.code.as_char();
-                    if let Some(new_char) = key_char
-                        && key_event.modifiers.is_empty()
-                    {
+                    if let Some(new_char) = self.get_char_from_key_event(key_event) {
                         self.handle_char_added(&mut stdout, new_char)?;
                     } else if key_event.code.is_enter() {
                         if let CommandOutcome::Close = self.handle_enter(&mut stdout) {
@@ -351,6 +348,18 @@ impl PleaseTerminal {
             Some(fitting_command)
         } else if self.cursor_position != self.history_pattern_position {
             Some(current_history_pattern.to_string())
+        } else {
+            None
+        }
+    }
+
+    fn get_char_from_key_event(&self, key_event: crossterm::event::KeyEvent) -> Option<char> {
+        if let Some(new_char) = key_event.code.as_char()
+            && !key_event
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            Some(new_char)
         } else {
             None
         }
