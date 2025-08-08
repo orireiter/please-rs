@@ -11,6 +11,8 @@ use crate::{
     terminal::traits::{self as terminal_traits, KeyHandling},
 };
 
+const SPACE: &str = " ";
+
 pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
@@ -59,21 +61,37 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
         command_outcome
     }
 
-    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_backspace(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        key_event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
         if self.cursor_position == 0 || self.live_command.user_command.is_empty() {
             return Ok(());
         }
 
         stdout.execute(crossterm_cursor::DisableBlinking)?;
 
-        self.live_command
-            .user_command
-            .remove(self.cursor_position.saturating_sub(1));
+        let steps = if key_event
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            self.calc_steps_to_previous_delimiter()
+        } else {
+            1
+        };
 
-        self.move_cursor_left(stdout, 1)?;
-        print!(" ");
-        self.cursor_position += 1;
-        self.move_cursor_left(stdout, 1)?;
+        for _ in 0..steps {
+            self.live_command
+                .user_command
+                .remove(self.cursor_position.saturating_sub(1));
+
+            self.move_cursor_left(stdout, 1)?;
+        }
+
+        print!("{}", SPACE.repeat(steps));
+        self.cursor_position += steps;
+        self.move_cursor_left(stdout, steps)?;
 
         // not sure why but if the backspace is not from at the end, we need an extra backspace
         let early_position = self.cursor_position;
@@ -109,13 +127,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             .modifiers
             .contains(crossterm::event::KeyModifiers::CONTROL)
         {
-            self.live_command.user_command[..self.cursor_position.saturating_sub(1)]
-                .iter()
-                .rev()
-                .position(|c| !c.is_alphanumeric())
-                // adding 1 to cross delimiter
-                .map(|index| index + 1)
-                .unwrap_or(self.cursor_position)
+            self.calc_steps_to_previous_delimiter()
         } else {
             1
         };
@@ -175,14 +187,17 @@ impl PleaseTerminal {
                         continue;
                     }
 
-                    if let Some(new_char) = key_event.code.as_char() {
+                    let key_char = key_event.code.as_char();
+                    if let Some(new_char) = key_char
+                        && key_event.modifiers.is_empty()
+                    {
                         self.handle_char_added(&mut stdout, new_char)?;
                     } else if key_event.code.is_enter() {
                         if let CommandOutcome::Close = self.handle_enter(&mut stdout) {
                             break;
                         };
-                    } else if key_event.code.is_backspace() {
-                        self.handle_backspace(&mut stdout)?;
+                    } else if self.is_backspace_key_event(key_event) {
+                        self.handle_backspace(&mut stdout, key_event)?;
                     } else if key_event.code.is_up() {
                         self.handle_up(&mut stdout)?;
                     } else if key_event.code.is_down() {
@@ -339,5 +354,25 @@ impl PleaseTerminal {
         } else {
             None
         }
+    }
+
+    fn is_backspace_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool {
+        key_event.code.is_backspace()
+            || key_event.code.as_char().is_some_and(|c| {
+                c == 'w'
+                    && key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL)
+            })
+    }
+
+    fn calc_steps_to_previous_delimiter(&self) -> usize {
+        self.live_command.user_command[..self.cursor_position.saturating_sub(1)]
+            .iter()
+            .rev()
+            .position(|c| !c.is_alphanumeric())
+            // adding 1 to cross delimiter
+            .map(|index| index + 1)
+            .unwrap_or(self.cursor_position)
     }
 }
