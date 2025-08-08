@@ -8,7 +8,10 @@ use std::io::Write;
 use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
+    terminal::traits::{self as terminal_traits, KeyHandling},
 };
+
+const SPACE: &str = " ";
 
 pub struct PleaseTerminal {
     live_command: LiveCommand,
@@ -18,62 +21,8 @@ pub struct PleaseTerminal {
     history_pattern_position: usize,
 }
 
-impl PleaseTerminal {
-    pub fn new(history: history::History) -> Self {
-        Self {
-            live_command: LiveCommand::new(),
-            history,
-            cursor_position: 0,
-            history_pattern_position: 0,
-        }
-    }
-
-    pub fn run(&mut self) -> Result<()> {
-        let mut stdout = std::io::stdout();
-
-        print!("{}", self.live_command.live_command_prefix());
-        stdout.flush()?;
-
-        loop {
-            let event = crossterm::event::read()?;
-            match event {
-                CrosstermTerminalEvent::Key(key_event) => {
-                    if !key_event.is_press() {
-                        continue;
-                    }
-
-                    if let Some(new_char) = key_event.code.as_char() {
-                        self.handle_char_added(&mut stdout, new_char)?;
-                    } else if key_event.code.is_enter() {
-                        if let CommandOutcome::Close = self.handle_enter_pressed(&mut stdout) {
-                            break;
-                        };
-                    } else if key_event.code.is_backspace() {
-                        self.handle_backspace(&mut stdout)?;
-                    } else if key_event.code.is_up() {
-                        self.handle_up_pressed(&mut stdout)?
-                    } else if key_event.code.is_down() {
-                        self.handle_down_pressed(&mut stdout)?
-                    } else if key_event.code.is_left() {
-                        self.move_cursor_left(&mut stdout, 1)?;
-                    } else if key_event.code.is_right() {
-                        self.move_cursor_right(&mut stdout, 1)?;
-                    }
-                }
-                CrosstermTerminalEvent::FocusGained => {}
-                CrosstermTerminalEvent::FocusLost => {}
-                CrosstermTerminalEvent::Mouse(_) => todo!(),
-                CrosstermTerminalEvent::Paste(_) => todo!(),
-                CrosstermTerminalEvent::Resize(_, _) => {}
-            }
-        }
-
-        self.history.save_history_to_persistent_file()?;
-
-        Ok(())
-    }
-
-    fn handle_enter_pressed(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
+impl terminal_traits::KeyHandling for PleaseTerminal {
+    fn handle_enter(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
         let attempted_command = self.live_command.user_command_as_string();
 
         println!();
@@ -112,35 +61,37 @@ impl PleaseTerminal {
         command_outcome
     }
 
-    fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
-        self.live_command
-            .user_command
-            .insert(self.cursor_position, new_char);
-
-        stdout.execute(crossterm_cursor::DisableBlinking)?;
-        self.write_command_suffix(stdout)?;
-        stdout.execute(crossterm_cursor::EnableBlinking)?;
-
-        self.history_pattern_position = self.cursor_position;
-        self.history.reset_history_search_index();
-        Ok(())
-    }
-
-    fn handle_backspace(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_backspace(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        key_event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
         if self.cursor_position == 0 || self.live_command.user_command.is_empty() {
             return Ok(());
         }
 
         stdout.execute(crossterm_cursor::DisableBlinking)?;
 
-        self.live_command
-            .user_command
-            .remove(self.cursor_position.saturating_sub(1));
+        let steps = if key_event
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            self.calc_steps_to_previous_delimiter()
+        } else {
+            1
+        };
 
-        self.move_cursor_left(stdout, 1)?;
-        print!(" ");
-        self.cursor_position += 1;
-        self.move_cursor_left(stdout, 1)?;
+        for _ in 0..steps {
+            self.live_command
+                .user_command
+                .remove(self.cursor_position.saturating_sub(1));
+
+            self.move_cursor_left(stdout, 1)?;
+        }
+
+        print!("{}", SPACE.repeat(steps));
+        self.cursor_position += steps;
+        self.move_cursor_left(stdout, steps)?;
 
         // not sure why but if the backspace is not from at the end, we need an extra backspace
         let early_position = self.cursor_position;
@@ -156,6 +107,128 @@ impl PleaseTerminal {
 
         stdout.execute(crossterm_cursor::EnableBlinking)?;
 
+        Ok(())
+    }
+
+    fn handle_up(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.handle_history_search(stdout, history::Direction::Previous)
+    }
+
+    fn handle_down(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.handle_history_search(stdout, history::Direction::Next)
+    }
+
+    fn handle_left(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        key_event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
+        let steps = if key_event
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            self.calc_steps_to_previous_delimiter()
+        } else {
+            1
+        };
+
+        self.move_cursor_left(stdout, steps)
+    }
+
+    fn handle_right(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        key_event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
+        let steps = if key_event
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            let command_len = self.live_command.user_command.len();
+
+            // getting current cursor but not exceeding command len
+            let start_index = self.cursor_position.min(command_len.saturating_sub(1));
+
+            self.live_command.user_command[start_index..]
+                .iter()
+                .position(|c| !c.is_alphanumeric())
+                // adding 1 to cross the delimiter
+                .map(|index| index + 1)
+                .unwrap_or_else(|| self.live_command.user_command.len() - self.cursor_position)
+        } else {
+            1
+        };
+
+        self.move_cursor_right(stdout, steps)
+    }
+}
+
+impl PleaseTerminal {
+    pub fn new(history: history::History) -> Self {
+        Self {
+            live_command: LiveCommand::new(),
+            history,
+            cursor_position: 0,
+            history_pattern_position: 0,
+        }
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        let mut stdout = std::io::stdout();
+
+        print!("{}", self.live_command.live_command_prefix());
+        stdout.flush()?;
+
+        loop {
+            let event = crossterm::event::read()?;
+            match event {
+                CrosstermTerminalEvent::Key(key_event) => {
+                    if !key_event.is_press() {
+                        continue;
+                    }
+
+                    if let Some(new_char) = self.get_char_from_key_event(key_event) {
+                        self.handle_char_added(&mut stdout, new_char)?;
+                    } else if key_event.code.is_enter() {
+                        if let CommandOutcome::Close = self.handle_enter(&mut stdout) {
+                            break;
+                        };
+                    } else if self.is_backspace_key_event(key_event) {
+                        self.handle_backspace(&mut stdout, key_event)?;
+                    } else if key_event.code.is_up() {
+                        self.handle_up(&mut stdout)?;
+                    } else if key_event.code.is_down() {
+                        self.handle_down(&mut stdout)?;
+                    } else if key_event.code.is_left() {
+                        self.handle_left(&mut stdout, key_event)?;
+                    } else if key_event.code.is_right() {
+                        self.handle_right(&mut stdout, key_event)?;
+                    }
+                }
+                CrosstermTerminalEvent::FocusGained => {}
+                CrosstermTerminalEvent::FocusLost => {}
+                CrosstermTerminalEvent::Mouse(_) => todo!(),
+                CrosstermTerminalEvent::Paste(_) => todo!(),
+                CrosstermTerminalEvent::Resize(_, _) => {}
+            }
+        }
+
+        self.history.save_history_to_persistent_file()?;
+
+        Ok(())
+    }
+
+    fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
+        self.live_command
+            .user_command
+            .insert(self.cursor_position, new_char);
+
+        stdout.execute(crossterm_cursor::DisableBlinking)?;
+        self.write_command_suffix(stdout)?;
+        stdout.execute(crossterm_cursor::EnableBlinking)?;
+
+        self.history_pattern_position = self.cursor_position;
+        self.history.reset_history_search_index();
         Ok(())
     }
 
@@ -219,14 +292,6 @@ impl PleaseTerminal {
         Ok(())
     }
 
-    fn handle_up_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        self.handle_history_search(stdout, history::Direction::Previous)
-    }
-
-    fn handle_down_pressed(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        self.handle_history_search(stdout, history::Direction::Next)
-    }
-
     fn handle_history_search(
         &mut self,
         stdout: &mut std::io::Stdout,
@@ -286,5 +351,37 @@ impl PleaseTerminal {
         } else {
             None
         }
+    }
+
+    fn get_char_from_key_event(&self, key_event: crossterm::event::KeyEvent) -> Option<char> {
+        if let Some(new_char) = key_event.code.as_char()
+            && !key_event
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            Some(new_char)
+        } else {
+            None
+        }
+    }
+
+    fn is_backspace_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool {
+        key_event.code.is_backspace()
+            || key_event.code.as_char().is_some_and(|c| {
+                c == 'w'
+                    && key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL)
+            })
+    }
+
+    fn calc_steps_to_previous_delimiter(&self) -> usize {
+        self.live_command.user_command[..self.cursor_position.saturating_sub(1)]
+            .iter()
+            .rev()
+            .position(|c| !c.is_alphanumeric())
+            // adding 1 to cross delimiter
+            .map(|index| index + 1)
+            .unwrap_or(self.cursor_position)
     }
 }
