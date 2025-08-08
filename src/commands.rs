@@ -144,7 +144,8 @@ impl LiveCommand {
             "failed to build base command for {executable} with {splitted_command:?}"
         ))?;
 
-        user_command.args(splitted_command);
+        let args = self.get_process_args(splitted_command);
+        user_command.args(args);
 
         crossterm::terminal::disable_raw_mode()?;
 
@@ -196,6 +197,28 @@ impl LiveCommand {
         }
 
         Ok(process::Command::new(executable))
+    }
+
+    fn get_process_args(&self, split_string: SplitWhitespace) -> Vec<String> {
+        let mut args = Vec::new();
+
+        let mut current_arg = String::new();
+        for arg in split_string {
+            if current_arg.starts_with("\"") || arg.starts_with("\"") {
+                let prefix = if current_arg.is_empty() { "" } else { " " };
+
+                current_arg.push_str(prefix);
+                current_arg.push_str(arg);
+                if arg.ends_with("\"") {
+                    args.push(current_arg.clone());
+                    current_arg.clear();
+                }
+            } else {
+                args.push(arg.to_string());
+            }
+        }
+
+        args
     }
 }
 

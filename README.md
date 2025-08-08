@@ -12,3 +12,5 @@
 6. Support quick jumps with <arrow|delete> + ctrl
 7. Validate why commands with `"` in them aren't interpreted correctly
 8. Support quick clear of command with `ctrl+c`
+9. Handle copy+pasting
+10. Add git visual support if not part of omz plugin support.
