@@ -218,7 +218,12 @@ impl LiveCommand {
                 current_arg.push_str(prefix);
                 current_arg.push_str(arg);
                 if arg.ends_with(q) {
-                    args.push(current_arg.clone());
+                    let to_push = current_arg
+                        .strip_prefix(q)
+                        .and_then(|a| a.strip_suffix(q))
+                        .unwrap_or(&current_arg);
+
+                    args.push(to_push.to_string());
                     current_arg.clear();
                     quotes_used = None;
                 }
