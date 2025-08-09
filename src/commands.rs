@@ -296,8 +296,16 @@ impl CommandExecution for NativeCommand {
                 crate::utils::clear_terminal(Some(clear_options))?;
                 Ok(CommandOutcome::Continue)
             }
-            Self::Ls(_path) => {
-                todo!("implement \"ls\"")
+            Self::Ls(path) => {
+                let path = if path.is_empty() { "." } else { path };
+
+                process::Command::new(CMD)
+                    .arg("/c")
+                    .arg("dir")
+                    .arg(path)
+                    .spawn()?
+                    .wait()?;
+                Ok(CommandOutcome::Continue)
             }
             Self::ChangeDir(new_dir) => {
                 std::env::set_current_dir(new_dir)?;
