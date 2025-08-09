@@ -239,9 +239,25 @@ impl PleaseTerminal {
             stdout.flush()?;
         }
 
-        stdout.execute(crossterm_terminal::Clear(
-            crossterm_terminal::ClearType::FromCursorDown,
-        ))?;
+        /*
+            The way that clearing the screen works is such that:
+            If you're exactly at the end of the line and clear,
+            you will continue writing at the end of the line instead of going down a row.
+            So not clearing in that case.
+        */
+        if let Ok(position) = crossterm_cursor::position()
+            && let Ok(size) = crossterm_terminal::size()
+        {
+            if position.0 + 1 != size.0 {
+                stdout.execute(crossterm_terminal::Clear(
+                    crossterm_terminal::ClearType::FromCursorDown,
+                ))?;
+            }
+        } else {
+            log::warn!(
+                "failed to get cursor position and terminal size to determine whether need to clear from cursor down"
+            )
+        }
 
         // since the print sends the actual cursor to the end, we rewind it
         self.cursor_position = self.live_command.user_command.len();
