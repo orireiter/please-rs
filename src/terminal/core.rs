@@ -8,7 +8,7 @@ use std::io::Write;
 use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
-    terminal::traits::{self as terminal_traits, KeyHandling},
+    terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
 };
 
 const SPACE: &str = " ";
@@ -161,8 +161,45 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         self.move_cursor_right(stdout, steps)
     }
+
+    fn handle_ctrl_c(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.move_cursor_right(
+            stdout,
+            self.live_command
+                .user_command
+                .len()
+                .saturating_sub(self.cursor_position)
+                .min(0),
+        )?;
+        print!("^C");
+        stdout.flush()?;
+
+        self.live_command.user_command.clear();
+        self.handle_enter(stdout);
+        Ok(())
+    }
 }
 
+impl terminal_traits::IsKeyEvents for PleaseTerminal {
+    fn is_backspace_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool {
+        key_event.code.is_backspace()
+            || key_event.code.as_char().is_some_and(|c| {
+                c == 'w'
+                    && key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL)
+            })
+    }
+
+    fn is_ctrl_c_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool {
+        key_event.code.as_char().is_some_and(|c| {
+            c == 'c'
+                && key_event
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL)
+        })
+    }
+}
 impl PleaseTerminal {
     pub fn new(history: history::History) -> Self {
         Self {
@@ -195,6 +232,8 @@ impl PleaseTerminal {
                         };
                     } else if self.is_backspace_key_event(key_event) {
                         self.handle_backspace(&mut stdout, key_event)?;
+                    } else if self.is_ctrl_c_key_event(key_event) {
+                        self.handle_ctrl_c(&mut stdout)?;
                     } else if key_event.code.is_up() {
                         self.handle_up(&mut stdout)?;
                     } else if key_event.code.is_down() {
@@ -379,16 +418,6 @@ impl PleaseTerminal {
         } else {
             None
         }
-    }
-
-    fn is_backspace_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool {
-        key_event.code.is_backspace()
-            || key_event.code.as_char().is_some_and(|c| {
-                c == 'w'
-                    && key_event
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL)
-            })
     }
 
     fn calc_steps_to_previous_delimiter(&self) -> usize {

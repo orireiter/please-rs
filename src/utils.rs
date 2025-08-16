@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::{QueueableCommand, cursor, terminal};
 
 pub const NEWLINE: &str = "\n";
@@ -43,6 +43,8 @@ pub fn clear_terminal(clear_options: Option<ClearOptions>) -> std::io::Result<()
 pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
     clear_terminal(None)?;
+
+    ctrlc::set_handler(|| {}).context("failed setting ctrl+c handler")?;
 
     Ok(())
 }

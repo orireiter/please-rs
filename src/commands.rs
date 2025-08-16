@@ -150,8 +150,10 @@ impl LiveCommand {
 
         crossterm::terminal::disable_raw_mode()?;
 
-        let mut output = user_command.spawn()?;
-        output.wait()?;
+        if let Err(e) = user_command.spawn().and_then(|mut c| c.wait()) {
+            log::error!("{e}");
+        };
+
         stdout.flush()?;
 
         crossterm::terminal::enable_raw_mode()?;
