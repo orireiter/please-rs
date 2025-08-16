@@ -17,3 +17,10 @@ pub trait KeyHandling {
 
     fn handle_right(&mut self, stdout: &mut std::io::Stdout, key_event: KeyEvent) -> Result<()>;
 }
+
+#[allow(dead_code)]
+pub trait IsKeyEvents {
+    fn is_backspace_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool;
+
+    fn is_ctrl_c_key_event(&self, key_event: crossterm::event::KeyEvent) -> bool;
+}
