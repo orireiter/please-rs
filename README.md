@@ -9,9 +9,9 @@
 5. Implement some useful commands:
 5.2 ls ✔️
 5.3. ...  
-6. Support quick jumps with <arrow|delete> + ctrl
+6. Support quick jumps with <arrow|delete> + ctrl ✔️
 7. Validate why commands with `"` in them aren't interpreted correctly ✔️
-8. Support quick clear of command with `ctrl+c`
+8. Support quick clear of command with `ctrl+c` ✔️
 9. Handle copy+pasting ✔️ (was working out of the box I think)
 10. Add git visual support if not part of omz plugin support.
 11. Add installation support to make usage easier
