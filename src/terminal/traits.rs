@@ -22,6 +22,8 @@ pub trait KeyHandling {
     fn handle_home(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
 
     fn handle_end(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
+
+    fn handle_tab(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
 }
 
 pub trait IsKeyEvents {

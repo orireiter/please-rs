@@ -192,6 +192,10 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         self.move_cursor_right(stdout, steps_right)
     }
+
+    fn handle_tab(&mut self, _stdout: &mut std::io::Stdout) -> Result<()> {
+        todo!()
+    }
 }
 
 impl terminal_traits::IsKeyEvents for PleaseTerminal {
@@ -246,6 +250,8 @@ impl PleaseTerminal {
                     self.handle_backspace(stdout, key_event)?;
                 } else if self.is_ctrl_c_key_event(key_event) {
                     self.handle_ctrl_c(stdout)?;
+                } else if key_event.code.is_tab() {
+                    self.handle_tab(stdout)?;
                 } else if key_event.code.is_up() {
                     self.handle_up(stdout)?;
                 } else if key_event.code.is_down() {
