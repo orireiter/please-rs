@@ -1,3 +1,4 @@
+pub mod completion;
 mod core;
 pub mod traits;
 

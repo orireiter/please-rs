@@ -6,7 +6,9 @@ use crossterm::{
 use std::io::Write;
 
 use crate::{
-    commands::{CommandOutcome, LiveCommand},
+    commands::{
+        CommandOutcome, LiveCommand, completion::get_completion_provider, traits::ConcatType,
+    },
     history,
     terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
     utils::{self, SPACE},
@@ -193,8 +195,34 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
         self.move_cursor_right(stdout, steps_right)
     }
 
-    fn handle_tab(&mut self, _stdout: &mut std::io::Stdout) -> Result<()> {
-        todo!()
+    fn handle_tab(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let command_string = self.live_command.user_command_as_string();
+
+        let completion_provider = get_completion_provider(&command_string);
+        let possible_completions = completion_provider.try_completing(&command_string)?;
+
+        if possible_completions.is_empty() {
+            return Ok(());
+        } else if possible_completions.len() == 1 {
+            let addition = &possible_completions[0];
+            match &addition.concat_type {
+                ConcatType::Delimited(concat_string) => {
+                    if !command_string.is_empty() {
+                        self.handle_string_added(stdout, concat_string)?;
+                    }
+
+                    self.handle_string_added(stdout, &addition.value)?;
+                }
+                ConcatType::PrefixConcat => {
+                    todo!("see where current string and addition overlap, only add the suffix")
+                }
+            }
+
+            stdout.flush()?;
+
+            return Ok(());
+        }
+        todo!("implement multiple-option handling");
     }
 }
 
@@ -305,6 +333,18 @@ impl PleaseTerminal {
 
         self.history_pattern_position = self.cursor_position;
         self.history.reset_history_search_index();
+        Ok(())
+    }
+
+    fn handle_string_added(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        new_string: &str,
+    ) -> Result<()> {
+        for c in new_string.chars() {
+            self.handle_char_added(stdout, c)?;
+        }
+
         Ok(())
     }
 
