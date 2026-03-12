@@ -10,7 +10,10 @@ use crate::{
         CommandOutcome, LiveCommand, completion::get_completion_provider, traits::ConcatType,
     },
     history,
-    terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+    terminal::{
+        tab_context,
+        traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+    },
     utils::{self, SPACE},
 };
 
@@ -222,7 +225,13 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
             return Ok(());
         }
-        todo!("implement multiple-option handling");
+
+        let mut tab_context_runner = tab_context::TabContext::new(&possible_completions, stdout);
+
+        let _tab_outcome = tab_context_runner.run()?;
+        // print!("{_tab_outcome:?}");
+        // stdout.flush()?;
+        Ok(())
     }
 }
 
