@@ -226,7 +226,9 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             return Ok(());
         }
 
-        let mut tab_context_runner = tab_context::TabContext::new(&possible_completions, stdout);
+        let latest_word = self.live_command.get_latest_word();
+        let mut tab_context_runner =
+            tab_context::TabContext::new(&possible_completions, &latest_word, stdout);
 
         let _tab_outcome = tab_context_runner.run()?;
         // print!("{_tab_outcome:?}");

@@ -24,17 +24,20 @@ pub enum TabResult {
 pub struct TabContext<'a> {
     possible_completions: &'a Vec<CompletionCandidate>,
     current_selection_index: usize,
+    current_live_command_latest_arg: &'a str,
     stdout: &'a mut std::io::Stdout,
 }
 
 impl<'a> TabContext<'a> {
     pub fn new(
         possible_completions: &'a Vec<CompletionCandidate>,
+        current_live_command_latest_arg: &'a str,
         stdout: &'a mut std::io::Stdout,
     ) -> Self {
         Self {
             possible_completions,
             current_selection_index: 0,
+            current_live_command_latest_arg,
             stdout,
         }
     }
@@ -103,11 +106,9 @@ impl<'a> TabContext<'a> {
                     } else if key_event.code.is_right() {
                         self.handle_right();
                     } else if key_event.code.is_enter() {
-                        return Ok(TabResult::AppendText(
-                            self.possible_completions[self.current_selection_index]
-                                .value
-                                .clone(),
-                        ));
+                        let text_to_append = self.get_text_to_append_from_selected_completion();
+
+                        return Ok(TabResult::AppendText(text_to_append));
                     } else {
                         return Ok(TabResult::KeyEvent(key_event));
                     }
@@ -146,6 +147,18 @@ impl<'a> TabContext<'a> {
     fn handle_left(&mut self) {
         if self.current_selection_index > 0 {
             self.current_selection_index -= 1;
+        }
+    }
+
+    fn get_text_to_append_from_selected_completion(&self) -> String {
+        let selected_value = self.possible_completions[self.current_selection_index]
+            .value
+            .clone();
+
+        if self.current_live_command_latest_arg.is_empty() {
+            selected_value
+        } else {
+            selected_value[self.current_live_command_latest_arg.len()..].to_string()
         }
     }
 }
