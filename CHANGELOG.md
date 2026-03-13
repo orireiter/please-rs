@@ -67,6 +67,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### 2026-03
 
+- Added tab completion context teardown in `TabContext`: split setup/run loop, clear UI on exit, and return owned completion text from selection.
 - Added tab context runner for completion navigation.
 - Added left-movement utility to support cursor manipulation.
 

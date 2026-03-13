@@ -1,8 +1,10 @@
 use std::io::Write;
 
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use crossterm::{
-    cursor as crossterm_cursor, event::Event as CrosstermEvent, event::KeyEvent, style::Attribute,
+    ExecutableCommand, cursor as crossterm_cursor,
+    event::{Event as CrosstermEvent, KeyEvent},
+    style::Attribute,
     terminal as crossterm_terminal,
 };
 
@@ -13,9 +15,9 @@ use crate::{
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum TabResult<'a> {
+pub enum TabResult {
     None,
-    AppendText(&'a String),
+    AppendText(String),
     KeyEvent(KeyEvent),
 }
 
@@ -52,7 +54,7 @@ impl<'a> TabContext<'a> {
         }
     }
 
-    fn setup_run(&mut self) -> Result<()> {
+    fn setup(&mut self) -> Result<()> {
         let steps_to_eol = self.calc_steps_end_of_line()?;
         for _ in 0..steps_to_eol {
             print!("{SPACE}");
@@ -74,9 +76,16 @@ impl<'a> TabContext<'a> {
         Ok(())
     }
 
-    pub fn run(&'_ mut self) -> Result<TabResult<'_>> {
-        self.setup_run()?;
+    fn teardown(&mut self) -> Result<()> {
+        self.stdout
+            .execute(crossterm_terminal::Clear(
+                crossterm_terminal::ClearType::FromCursorDown,
+            ))
+            .context("failed to teardown tab context")?;
+        Ok(())
+    }
 
+    fn run_loop(&mut self) -> Result<TabResult> {
         loop {
             let event = crossterm::event::read()?;
             match event {
@@ -95,13 +104,15 @@ impl<'a> TabContext<'a> {
                         self.handle_right();
                     } else if key_event.code.is_enter() {
                         return Ok(TabResult::AppendText(
-                            &self.possible_completions[self.current_selection_index].value,
+                            self.possible_completions[self.current_selection_index]
+                                .value
+                                .clone(),
                         ));
                     } else {
                         return Ok(TabResult::KeyEvent(key_event));
                     }
 
-                    self.setup_run()?;
+                    self.setup()?;
                 }
                 CrosstermEvent::FocusLost | CrosstermEvent::FocusGained => {
                     continue;
@@ -109,6 +120,14 @@ impl<'a> TabContext<'a> {
                 _ => todo!("{event:?}"),
             }
         }
+    }
+
+    pub fn run(&mut self) -> Result<TabResult> {
+        self.setup()?;
+        let result = self.run_loop();
+        self.teardown()?;
+
+        result
     }
 
     fn calc_steps_end_of_line(&self) -> Result<usize> {
