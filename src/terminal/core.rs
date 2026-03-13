@@ -11,7 +11,7 @@ use crate::{
     },
     history,
     terminal::{
-        tab_context,
+        tab_context::{self, TabResult},
         traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
     },
     utils::{self, SPACE},
@@ -230,9 +230,19 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
         let mut tab_context_runner =
             tab_context::TabContext::new(&possible_completions, &latest_word, stdout);
 
-        let _tab_outcome = tab_context_runner.run()?;
-        // print!("{_tab_outcome:?}");
-        // stdout.flush()?;
+        let tab_outcome = tab_context_runner.run()?;
+
+        match tab_outcome {
+            TabResult::AppendText(text) => {
+                for new_char in text.chars() {
+                    self.handle_char_added(stdout, new_char)?;
+                }
+            }
+            TabResult::KeyEvent(key_event) => {
+                self.handle_event(stdout, CrosstermTerminalEvent::Key(key_event))?;
+            }
+        }
+
         Ok(())
     }
 }

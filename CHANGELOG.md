@@ -67,6 +67,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### 2026-03
 
+- Started consuming tab context run results in terminal flow, wiring completion selection outcomes into the interaction path (ab84514).
 - Tab completion now appends only the suffix needed to complete what the user already typed, avoiding duplicating existing input (0e812ea).
 - Refactored terminal flow by separating the main run loop from event-handling logic in `src/terminal/core.rs` (7d8bbed).
 - Added tab completion context teardown in `TabContext`: split setup/run loop, clear UI on exit, and return owned completion text from selection.

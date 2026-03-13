@@ -14,9 +14,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum TabResult {
-    None,
     AppendText(String),
     KeyEvent(KeyEvent),
 }
