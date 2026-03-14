@@ -10,7 +10,7 @@ use crossterm::{
 
 use crate::{
     commands::traits::{CompletionCandidate, ConcatType},
-    utils::{self, SPACE},
+    utils::SPACE,
 };
 
 #[derive(Debug)]
@@ -58,6 +58,8 @@ impl<'a> TabContext<'a> {
     }
 
     fn setup(&mut self) -> Result<()> {
+        self.stdout.queue(crossterm_cursor::SavePosition)?;
+
         let steps_to_eol = self.calc_steps_end_of_line()?;
         self.stdout.queue(crossterm_cursor::Hide)?;
 
@@ -67,7 +69,6 @@ impl<'a> TabContext<'a> {
 
         self.stdout.flush()?;
 
-        let mut cursor_advancement = 0;
         for i in 0..self.possible_completions.len() {
             let start_index = crossterm_cursor::position()?;
 
@@ -75,15 +76,13 @@ impl<'a> TabContext<'a> {
 
             let stylized_candidate = self.get_stylized_candidate(i);
             print!("{}", stylized_candidate);
-            cursor_advancement += self.possible_completions[i].value.len() + 2;
             self.stdout.flush()?;
         }
 
-        for _ in 0..(cursor_advancement + steps_to_eol) {
-            utils::move_left(self.stdout)?;
-        }
-
-        self.stdout.execute(crossterm_cursor::Show)?;
+        self.stdout
+            .queue(crossterm_cursor::RestorePosition)?
+            .queue(crossterm_cursor::Show)?
+            .flush()?;
 
         Ok(())
     }

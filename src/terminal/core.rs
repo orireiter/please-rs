@@ -351,9 +351,9 @@ impl PleaseTerminal {
             .user_command
             .insert(self.cursor_position, new_char);
 
-        stdout.execute(crossterm_cursor::DisableBlinking)?;
+        stdout.execute(crossterm_cursor::Hide)?;
         self.write_command_suffix(stdout)?;
-        stdout.execute(crossterm_cursor::EnableBlinking)?;
+        stdout.execute(crossterm_cursor::Show)?;
 
         self.history_pattern_position = self.cursor_position;
         self.history.reset_history_search_index();
@@ -453,7 +453,7 @@ impl PleaseTerminal {
         if let Some(fitting_command) = new_command {
             self.live_command.user_command = fitting_command.chars().collect();
 
-            stdout.execute(crossterm_cursor::DisableBlinking)?;
+            stdout.execute(crossterm_cursor::Hide)?;
             self.move_cursor_left(
                 stdout,
                 current_command_string
@@ -469,10 +469,10 @@ impl PleaseTerminal {
                     .saturating_sub(self.cursor_position),
             )?;
 
-            stdout.execute(crossterm_cursor::EnableBlinking)?;
+            stdout.execute(crossterm_cursor::Show)?;
         }
 
-        stdout.execute(crossterm_cursor::EnableBlinking)?;
+        stdout.execute(crossterm_cursor::Show)?;
 
         Ok(())
     }
