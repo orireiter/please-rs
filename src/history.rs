@@ -107,7 +107,6 @@ impl History {
     }
 
     pub fn navigate_to_next(&mut self, pattern: &str) -> Option<&str> {
-        // todo!("make sure this works!");
         let last_stopped_index = self.last_stopped_index?;
 
         if last_stopped_index == 0 {
