@@ -1,8 +1,8 @@
-use std::io::Write;
+use std::{collections::HashMap, io::Write};
 
 use anyhow::{Context, Ok, Result};
 use crossterm::{
-    ExecutableCommand, cursor as crossterm_cursor,
+    ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
     event::{Event as CrosstermEvent, KeyEvent},
     style::Attribute,
     terminal as crossterm_terminal,
@@ -21,6 +21,7 @@ pub enum TabResult {
 
 pub struct TabContext<'a> {
     possible_completions: &'a Vec<CompletionCandidate>,
+    completions_position_mapping: HashMap<usize, (u16, u16)>,
     current_selection_index: usize,
     current_live_command_latest_arg: &'a str,
     stdout: &'a mut std::io::Stdout,
@@ -34,6 +35,7 @@ impl<'a> TabContext<'a> {
     ) -> Self {
         Self {
             possible_completions,
+            completions_position_mapping: HashMap::new(),
             current_selection_index: 0,
             current_live_command_latest_arg,
             stdout,
@@ -57,23 +59,59 @@ impl<'a> TabContext<'a> {
 
     fn setup(&mut self) -> Result<()> {
         let steps_to_eol = self.calc_steps_end_of_line()?;
+        self.stdout.queue(crossterm_cursor::Hide)?;
+
         for _ in 0..steps_to_eol {
             print!("{SPACE}");
         }
 
+        self.stdout.flush()?;
+
         let mut cursor_advancement = 0;
         for i in 0..self.possible_completions.len() {
+            let start_index = crossterm_cursor::position()?;
+
+            self.completions_position_mapping.insert(i, start_index);
+
             let stylized_candidate = self.get_stylized_candidate(i);
             print!("{}", stylized_candidate);
             cursor_advancement += self.possible_completions[i].value.len() + 2;
+            self.stdout.flush()?;
         }
-
-        self.stdout.flush()?;
 
         for _ in 0..(cursor_advancement + steps_to_eol) {
             utils::move_left(self.stdout)?;
         }
 
+        self.stdout.execute(crossterm_cursor::Show)?;
+
+        Ok(())
+    }
+
+    fn update_selection_style(&mut self, previous_index: usize, new_index: usize) -> Result<()> {
+        self.stdout.queue(crossterm_cursor::SavePosition)?;
+
+        let (previous_index_x, previous_index_y) = self
+            .completions_position_mapping
+            .get(&previous_index)
+            .context("failed to get position of previously selected candidate")?;
+        self.stdout.queue(crossterm_cursor::MoveTo(
+            *previous_index_x,
+            *previous_index_y,
+        ))?;
+        print!("{}", self.get_stylized_candidate(previous_index));
+
+        let (new_index_x, new_index_y) = self
+            .completions_position_mapping
+            .get(&new_index)
+            .context("failed to get position of new selected candidate")?;
+        self.stdout
+            .queue(crossterm_cursor::MoveTo(*new_index_x, *new_index_y))?;
+        print!("{}", self.get_stylized_candidate(new_index));
+
+        self.stdout
+            .queue(crossterm_cursor::RestorePosition)?
+            .flush()?;
         Ok(())
     }
 
@@ -100,16 +138,14 @@ impl<'a> TabContext<'a> {
                     } else if key_event.code.is_down() {
                         todo!("handle tab down key");
                     } else if key_event.code.is_left() {
-                        self.handle_left();
+                        self.handle_left()?;
                     } else if key_event.code.is_right() {
-                        self.handle_right();
+                        self.handle_right()?;
                     } else if key_event.code.is_enter() {
                         return Ok(self.get_selected_tab_result());
                     } else {
                         return Ok(TabResult::KeyEvent(key_event));
                     } // todo specifically handle ctrl c?
-
-                    self.setup()?;
                 }
                 CrosstermEvent::FocusLost | CrosstermEvent::FocusGained => {
                     continue;
@@ -134,16 +170,29 @@ impl<'a> TabContext<'a> {
         Ok(terminal_size_x.saturating_sub(cursor_x).into())
     }
 
-    fn handle_right(&mut self) {
+    fn handle_right(&mut self) -> Result<()> {
         if self.current_selection_index != self.possible_completions.len() - 1 {
             self.current_selection_index += 1;
+
+            self.update_selection_style(
+                self.current_selection_index - 1,
+                self.current_selection_index,
+            )?;
         }
+
+        Ok(())
     }
 
-    fn handle_left(&mut self) {
+    fn handle_left(&mut self) -> Result<()> {
         if self.current_selection_index > 0 {
             self.current_selection_index -= 1;
+            self.update_selection_style(
+                self.current_selection_index + 1,
+                self.current_selection_index,
+            )?;
         }
+
+        Ok(())
     }
 
     fn get_selected_tab_result(&self) -> TabResult {
