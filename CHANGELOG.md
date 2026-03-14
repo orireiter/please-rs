@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Project Snapshot (2026-03-13)
+### Project Snapshot (2026-03-14)
 
 This changelog is intentionally developer-facing. It is meant to help resume work quickly.
 
@@ -36,7 +36,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 ### In Progress / Partially Wired
 
 - Multi-candidate tab UI (`TabContext`) can render and move selection with left/right.
-- `handle_tab` creates/runs tab context but currently does not apply the selected completion back into the live command.
+- `handle_tab` now consumes tab context outcomes, but completion behavior is still partial (`PrefixConcat` path is still TODO).
 - Directory completion provider mostly returns entries from current directory; argument/path-specific completion is still marked TODO.
 
 ### Known Gaps
@@ -49,11 +49,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### Local Working Tree Notes
 
-- Current unstaged edits exist in:
-	- `src/commands/completion.rs`
-	- `src/commands/traits.rs`
-	- `src/terminal/tab_context.rs`
-- This file (`CHANGELOG.md`) is new.
+- Working tree was clean when this snapshot was updated.
 
 ### Suggested Next Steps (Resume Order)
 
@@ -67,12 +63,16 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### 2026-03
 
-- Started consuming tab context run results in terminal flow, wiring completion selection outcomes into the interaction path (ab84514).
-- Tab completion now appends only the suffix needed to complete what the user already typed, avoiding duplicating existing input (0e812ea).
-- Refactored terminal flow by separating the main run loop from event-handling logic in `src/terminal/core.rs` (7d8bbed).
-- Added tab completion context teardown in `TabContext`: split setup/run loop, clear UI on exit, and return owned completion text from selection.
-- Added tab context runner for completion navigation.
-- Added left-movement utility to support cursor manipulation.
+- Added Home/End key handling for faster line navigation in terminal input (#16, 75410a8).
+- Moved left-cursor utility into shared utils (#17, 3714901).
+- Moved shared `SPACE` constant into utils for cross-module reuse (#18, ba212e5).
+- Refactored terminal by separating main loop from event handling logic (#19, 36c0049).
+- Merged command sub-module extraction into this branch (#20, 15d3e83).
+- Started consuming tab context run results in terminal flow, wiring completion selection outcomes into the interaction path (47f2688).
+- Tab completion matching now returns only the suffix that needs to be appended (b612a8f).
+- Added tab completion context teardown in `TabContext`: split setup/run loop, clear UI on exit, and return owned completion text from selection (614251d).
+- Added changelog file to track project state over time (bb06e72).
+- Added tab context runner for completion navigation (780dcb6).
 
 ### 2025-10
 
