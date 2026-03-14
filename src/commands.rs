@@ -5,6 +5,8 @@ use std::str::SplitWhitespace;
 
 use anyhow::{Context, Result};
 
+use crate::utils::SPACE;
+
 const CMD: &str = "cmd";
 const RESERVED_CMD_COMMANDS: [&str; 82] = [
     "ASSOC",
@@ -215,7 +217,7 @@ impl LiveCommand {
             }
 
             if let Some(q) = quotes_used {
-                let prefix = if current_arg.is_empty() { "" } else { " " };
+                let prefix = if current_arg.is_empty() { "" } else { SPACE };
 
                 current_arg.push_str(prefix);
                 current_arg.push_str(arg);
