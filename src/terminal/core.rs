@@ -9,10 +9,8 @@ use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
     terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
-    utils,
+    utils::{self, SPACE},
 };
-
-const SPACE: &str = " ";
 
 pub struct PleaseTerminal {
     live_command: LiveCommand,

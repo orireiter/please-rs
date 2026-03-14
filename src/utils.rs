@@ -3,6 +3,7 @@ use std::io::Write;
 use anyhow::{Context, Result};
 use crossterm::{ExecutableCommand, QueueableCommand, cursor, terminal};
 
+pub const SPACE: &str = " ";
 pub const NEWLINE: &str = "\n";
 pub const HOME_DIR: &str = "~/";
 
