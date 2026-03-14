@@ -238,6 +238,17 @@ impl LiveCommand {
 
         args
     }
+
+    pub fn get_latest_word(&self) -> String {
+        let start = self
+            .user_command
+            .iter()
+            .rposition(|&c| c == ' ')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+
+        self.user_command[start..].iter().collect()
+    }
 }
 
 trait CommandExecution {

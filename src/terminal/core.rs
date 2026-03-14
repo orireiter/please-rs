@@ -6,9 +6,14 @@ use crossterm::{
 use std::io::Write;
 
 use crate::{
-    commands::{CommandOutcome, LiveCommand},
+    commands::{
+        CommandOutcome, LiveCommand, completion::get_completion_provider, traits::ConcatType,
+    },
     history,
-    terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+    terminal::{
+        tab_context::{self, TabResult},
+        traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+    },
     utils::{self, SPACE},
 };
 
@@ -192,6 +197,57 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         self.move_cursor_right(stdout, steps_right)
     }
+
+    fn handle_tab(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let command_string = self.live_command.user_command_as_string();
+
+        let completion_provider = get_completion_provider(&command_string);
+        let possible_completions = completion_provider.try_completing(&command_string)?;
+
+        if possible_completions.is_empty() {
+            return Ok(());
+        } else if possible_completions.len() == 1 {
+            let addition = &possible_completions[0];
+            match &addition.concat_type {
+                ConcatType::Delimited(concat_string) => {
+                    if !command_string.is_empty() {
+                        self.handle_string_added(stdout, concat_string)?;
+                    }
+
+                    self.handle_string_added(stdout, &addition.value)?;
+                }
+                ConcatType::PrefixConcat(start_index) => {
+                    self.handle_string_added(stdout, &addition.value[start_index.to_owned()..])?;
+                }
+            }
+
+            stdout.flush()?;
+
+            return Ok(());
+        }
+
+        // moving the cursor to end of command to allow appending completion later on
+        self.handle_end(stdout)?;
+
+        let latest_word = self.live_command.get_latest_word();
+        let mut tab_context_runner =
+            tab_context::TabContext::new(&possible_completions, &latest_word, stdout);
+
+        let tab_outcome = tab_context_runner.run()?;
+
+        match tab_outcome {
+            TabResult::AppendText(text) => {
+                for new_char in text.chars() {
+                    self.handle_char_added(stdout, new_char)?;
+                }
+            }
+            TabResult::KeyEvent(key_event) => {
+                self.handle_event(stdout, CrosstermTerminalEvent::Key(key_event))?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl terminal_traits::IsKeyEvents for PleaseTerminal {
@@ -246,6 +302,8 @@ impl PleaseTerminal {
                     self.handle_backspace(stdout, key_event)?;
                 } else if self.is_ctrl_c_key_event(key_event) {
                     self.handle_ctrl_c(stdout)?;
+                } else if key_event.code.is_tab() {
+                    self.handle_tab(stdout)?;
                 } else if key_event.code.is_up() {
                     self.handle_up(stdout)?;
                 } else if key_event.code.is_down() {
@@ -299,6 +357,18 @@ impl PleaseTerminal {
 
         self.history_pattern_position = self.cursor_position;
         self.history.reset_history_search_index();
+        Ok(())
+    }
+
+    fn handle_string_added(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        new_string: &str,
+    ) -> Result<()> {
+        for c in new_string.chars() {
+            self.handle_char_added(stdout, c)?;
+        }
+
         Ok(())
     }
 
