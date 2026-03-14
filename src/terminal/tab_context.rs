@@ -9,7 +9,7 @@ use crossterm::{
 };
 
 use crate::{
-    commands::traits::CompletionCandidate,
+    commands::traits::{CompletionCandidate, ConcatType},
     utils::{self, SPACE},
 };
 
@@ -104,12 +104,10 @@ impl<'a> TabContext<'a> {
                     } else if key_event.code.is_right() {
                         self.handle_right();
                     } else if key_event.code.is_enter() {
-                        let text_to_append = self.get_text_to_append_from_selected_completion();
-
-                        return Ok(TabResult::AppendText(text_to_append));
+                        return Ok(self.get_selected_tab_result());
                     } else {
                         return Ok(TabResult::KeyEvent(key_event));
-                    }
+                    } // todo specifically handle ctrl c?
 
                     self.setup()?;
                 }
@@ -148,15 +146,21 @@ impl<'a> TabContext<'a> {
         }
     }
 
-    fn get_text_to_append_from_selected_completion(&self) -> String {
-        let selected_value = self.possible_completions[self.current_selection_index]
-            .value
-            .clone();
+    fn get_selected_tab_result(&self) -> TabResult {
+        let selected_completion = &self.possible_completions[self.current_selection_index];
 
         if self.current_live_command_latest_arg.is_empty() {
-            selected_value
-        } else {
-            selected_value[self.current_live_command_latest_arg.len()..].to_string()
+            return TabResult::AppendText(selected_completion.value.clone());
+        }
+
+        match &selected_completion.concat_type {
+            ConcatType::Delimited(delimiter) => {
+                TabResult::AppendText(delimiter.to_owned() + &selected_completion.value.to_string())
+            }
+            ConcatType::PrefixConcat(start_index) => {
+                let sliced_string = selected_completion.value[start_index.to_owned()..].to_string();
+                TabResult::AppendText(sliced_string)
+            }
         }
     }
 }

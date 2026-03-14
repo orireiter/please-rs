@@ -63,6 +63,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### 2026-03
 
+- Implemented tab completion flow for both delimiter-based and prefix-based completion strategies, wiring behavior across completion provider, traits, and terminal integration (1bb0488).
 - Added Home/End key handling for faster line navigation in terminal input (#16, 75410a8).
 - Moved left-cursor utility into shared utils (#17, 3714901).
 - Moved shared `SPACE` constant into utils for cross-module reuse (#18, ba212e5).

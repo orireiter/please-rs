@@ -216,8 +216,8 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
                     self.handle_string_added(stdout, &addition.value)?;
                 }
-                ConcatType::PrefixConcat => {
-                    todo!("see where current string and addition overlap, only add the suffix")
+                ConcatType::PrefixConcat(start_index) => {
+                    self.handle_string_added(stdout, &addition.value[start_index.to_owned()..])?;
                 }
             }
 
@@ -225,6 +225,9 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
             return Ok(());
         }
+
+        // moving the cursor to end of command to allow appending completion later on
+        self.handle_end(stdout)?;
 
         let latest_word = self.live_command.get_latest_word();
         let mut tab_context_runner =

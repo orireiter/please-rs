@@ -6,8 +6,7 @@ pub enum ConcatType {
     Delimited(String),
 
     /// "foo" + "foobar" -> "foobar"
-    #[allow(dead_code)]
-    PrefixConcat,
+    PrefixConcat(usize),
 }
 
 #[derive(Debug)]
