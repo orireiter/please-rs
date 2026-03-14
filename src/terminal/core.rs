@@ -12,6 +12,11 @@ use crate::{
     utils::{self, SPACE},
 };
 
+enum TerminalLoopEvent {
+    Contiue,
+    Exit,
+}
+
 pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
@@ -209,6 +214,7 @@ impl terminal_traits::IsKeyEvents for PleaseTerminal {
         })
     }
 }
+
 impl PleaseTerminal {
     pub fn new(history: history::History) -> Self {
         Self {
@@ -216,6 +222,51 @@ impl PleaseTerminal {
             history,
             cursor_position: 0,
             history_pattern_position: 0,
+        }
+    }
+
+    fn handle_event(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        event: CrosstermTerminalEvent,
+    ) -> Result<TerminalLoopEvent> {
+        match event {
+            CrosstermTerminalEvent::Key(key_event) => {
+                if !key_event.is_press() {
+                    return Ok(TerminalLoopEvent::Contiue);
+                }
+
+                if let Some(new_char) = self.get_char_from_key_event(key_event) {
+                    self.handle_char_added(stdout, new_char)?;
+                } else if key_event.code.is_enter() {
+                    if let CommandOutcome::Close = self.handle_enter(stdout) {
+                        return Ok(TerminalLoopEvent::Exit);
+                    };
+                } else if self.is_backspace_key_event(key_event) {
+                    self.handle_backspace(stdout, key_event)?;
+                } else if self.is_ctrl_c_key_event(key_event) {
+                    self.handle_ctrl_c(stdout)?;
+                } else if key_event.code.is_up() {
+                    self.handle_up(stdout)?;
+                } else if key_event.code.is_down() {
+                    self.handle_down(stdout)?;
+                } else if key_event.code.is_left() {
+                    self.handle_left(stdout, key_event)?;
+                } else if key_event.code.is_right() {
+                    self.handle_right(stdout, key_event)?;
+                } else if key_event.code.is_home() {
+                    self.handle_home(stdout)?;
+                } else if key_event.code.is_end() {
+                    self.handle_end(stdout)?;
+                }
+
+                Ok(TerminalLoopEvent::Contiue)
+            }
+            CrosstermTerminalEvent::FocusGained
+            | CrosstermTerminalEvent::FocusLost
+            | CrosstermTerminalEvent::Resize(_, _) => Ok(TerminalLoopEvent::Contiue),
+            CrosstermTerminalEvent::Mouse(_) => todo!(),
+            CrosstermTerminalEvent::Paste(_) => todo!(),
         }
     }
 
@@ -227,41 +278,8 @@ impl PleaseTerminal {
 
         loop {
             let event = crossterm::event::read()?;
-            match event {
-                CrosstermTerminalEvent::Key(key_event) => {
-                    if !key_event.is_press() {
-                        continue;
-                    }
-
-                    if let Some(new_char) = self.get_char_from_key_event(key_event) {
-                        self.handle_char_added(&mut stdout, new_char)?;
-                    } else if key_event.code.is_enter() {
-                        if let CommandOutcome::Close = self.handle_enter(&mut stdout) {
-                            break;
-                        };
-                    } else if self.is_backspace_key_event(key_event) {
-                        self.handle_backspace(&mut stdout, key_event)?;
-                    } else if self.is_ctrl_c_key_event(key_event) {
-                        self.handle_ctrl_c(&mut stdout)?;
-                    } else if key_event.code.is_up() {
-                        self.handle_up(&mut stdout)?;
-                    } else if key_event.code.is_down() {
-                        self.handle_down(&mut stdout)?;
-                    } else if key_event.code.is_left() {
-                        self.handle_left(&mut stdout, key_event)?;
-                    } else if key_event.code.is_right() {
-                        self.handle_right(&mut stdout, key_event)?;
-                    } else if key_event.code.is_home() {
-                        self.handle_home(&mut stdout)?;
-                    } else if key_event.code.is_end() {
-                        self.handle_end(&mut stdout)?;
-                    }
-                }
-                CrosstermTerminalEvent::FocusGained => {}
-                CrosstermTerminalEvent::FocusLost => {}
-                CrosstermTerminalEvent::Mouse(_) => todo!(),
-                CrosstermTerminalEvent::Paste(_) => todo!(),
-                CrosstermTerminalEvent::Resize(_, _) => {}
+            if let TerminalLoopEvent::Exit = self.handle_event(&mut stdout, event)? {
+                break;
             }
         }
 
