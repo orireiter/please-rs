@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::{Context, Result};
-use crossterm::{QueueableCommand, cursor, terminal};
+use crossterm::{ExecutableCommand, QueueableCommand, cursor, terminal};
 
 pub const NEWLINE: &str = "\n";
 pub const HOME_DIR: &str = "~/";
@@ -45,6 +45,23 @@ pub fn init_terminal() -> Result<()> {
     clear_terminal(None)?;
 
     ctrlc::set_handler(|| {}).context("failed setting ctrl+c handler")?;
+
+    Ok(())
+}
+
+pub fn move_left(stdout: &mut std::io::Stdout) -> Result<()> {
+    let (x, y) = cursor::position()?;
+
+    if x == 0 {
+        if y == 0 {
+            return Ok(());
+        }
+
+        let terminal_size = terminal::size()?;
+        stdout.execute(cursor::MoveTo(terminal_size.0, y - 1))?;
+    } else {
+        stdout.execute(cursor::MoveLeft(1))?;
+    }
 
     Ok(())
 }
