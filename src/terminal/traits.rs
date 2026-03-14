@@ -18,6 +18,10 @@ pub trait KeyHandling {
     fn handle_right(&mut self, stdout: &mut std::io::Stdout, key_event: KeyEvent) -> Result<()>;
 
     fn handle_ctrl_c(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
+
+    fn handle_home(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
+
+    fn handle_end(&mut self, stdout: &mut std::io::Stdout) -> Result<()>;
 }
 
 pub trait IsKeyEvents {

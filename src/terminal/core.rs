@@ -178,6 +178,16 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
         self.handle_enter(stdout);
         Ok(())
     }
+
+    fn handle_home(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        self.move_cursor_left(stdout, self.cursor_position)
+    }
+
+    fn handle_end(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let steps_right = self.live_command.user_command_as_string().len() - self.cursor_position;
+
+        self.move_cursor_right(stdout, steps_right)
+    }
 }
 
 impl terminal_traits::IsKeyEvents for PleaseTerminal {
@@ -242,6 +252,10 @@ impl PleaseTerminal {
                         self.handle_left(&mut stdout, key_event)?;
                     } else if key_event.code.is_right() {
                         self.handle_right(&mut stdout, key_event)?;
+                    } else if key_event.code.is_home() {
+                        self.handle_home(&mut stdout)?;
+                    } else if key_event.code.is_end() {
+                        self.handle_end(&mut stdout)?;
                     }
                 }
                 CrosstermTerminalEvent::FocusGained => {}
