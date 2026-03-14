@@ -10,7 +10,19 @@ use crate::{
     utils::SPACE,
 };
 
-pub fn get_completion_provider(_current_command: &str) -> Box<dyn CompletionProvider> {
+pub fn get_completion_provider(current_command: &str) -> Box<dyn CompletionProvider> {
+    // todo make the ordering configurable
+    let providers: [Box<dyn CompletionProvider>; 2] = [
+        Box::new(GitCompletionProvider),
+        Box::new(DirectoryCompletionProvider),
+    ];
+
+    for provider in providers {
+        if provider.is_valid_provider(current_command) {
+            return provider;
+        }
+    }
+
     Box::new(DirectoryCompletionProvider)
 }
 
@@ -82,5 +94,22 @@ impl CompletionProvider for DirectoryCompletionProvider {
         }
 
         Ok(candidates)
+    }
+}
+
+struct GitCompletionProvider;
+
+impl GitCompletionProvider {
+    pub const GIT: &str = "git";
+}
+
+impl CompletionProvider for GitCompletionProvider {
+    fn is_valid_provider(&self, current_command: &str) -> bool {
+        current_command.trim().to_lowercase().as_str() == Self::GIT
+        // todo optimize
+    }
+
+    fn try_completing(&self, _current_command: &str) -> anyhow::Result<Vec<CompletionCandidate>> {
+        todo!("implement git completion")
     }
 }

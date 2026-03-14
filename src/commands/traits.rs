@@ -23,7 +23,6 @@ impl CompletionCandidate {
 }
 
 pub trait CompletionProvider {
-    #[allow(dead_code)]
     fn is_valid_provider(&self, current_command: &str) -> bool;
 
     fn try_completing(&self, current_command: &str) -> Result<Vec<CompletionCandidate>>;
