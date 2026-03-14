@@ -9,6 +9,7 @@ use crate::{
     commands::{CommandOutcome, LiveCommand},
     history,
     terminal::traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+    utils,
 };
 
 const SPACE: &str = " ";
@@ -346,15 +347,7 @@ impl PleaseTerminal {
                 break;
             }
 
-            let (x, y) = crossterm_cursor::position()?;
-            if x == 0 && y == 0 {
-                break;
-            } else if x > 0 {
-                stdout.execute(crossterm_cursor::MoveLeft(1))?;
-            } else {
-                let terminal_size = crossterm_terminal::size()?;
-                stdout.execute(crossterm_cursor::MoveTo(terminal_size.0, y - 1))?;
-            }
+            utils::move_left(stdout)?;
             self.cursor_position = self.cursor_position.saturating_sub(1);
         }
 
