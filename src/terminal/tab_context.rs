@@ -180,9 +180,9 @@ impl<'a> TabContext<'a> {
                     }
 
                     if key_event.code.is_up() {
-                        todo!("handle tab up key");
+                        self.handle_up()?;
                     } else if key_event.code.is_down() {
-                        todo!("handle tab down key");
+                        self.handle_down()?;
                     } else if key_event.code.is_left() {
                         self.handle_left()?;
                     } else if key_event.code.is_right() {
@@ -244,6 +244,34 @@ impl<'a> TabContext<'a> {
             self.current_selection_index = self.possible_completions.len() - 1;
 
             self.update_selection_style(0, self.current_selection_index)?;
+        }
+
+        Ok(())
+    }
+
+    fn handle_up(&mut self) -> Result<()> {
+        let row = self.current_selection_index / self.candidates_grid_config.starting_indices.len();
+
+        if row != 0 {
+            self.current_selection_index -= self.candidates_grid_config.starting_indices.len();
+            self.update_selection_style(
+                self.current_selection_index + self.candidates_grid_config.starting_indices.len(),
+                self.current_selection_index,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn handle_down(&mut self) -> Result<()> {
+        if self.current_selection_index
+            < self.possible_completions.len() - self.candidates_grid_config.starting_indices.len()
+        {
+            self.current_selection_index += self.candidates_grid_config.starting_indices.len();
+            self.update_selection_style(
+                self.current_selection_index - self.candidates_grid_config.starting_indices.len(),
+                self.current_selection_index,
+            )?;
         }
 
         Ok(())

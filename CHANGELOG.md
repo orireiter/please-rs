@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Project Snapshot (2026-03-14)
+### Project Snapshot (2026-03-16)
 
 This changelog is intentionally developer-facing. It is meant to help resume work quickly.
 
@@ -35,7 +35,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### In Progress / Partially Wired
 
-- Multi-candidate tab UI (`TabContext`) can render and move selection with left/right.
+- Multi-candidate tab UI (`TabContext`) can render and move selection with left/right/up/down.
 - `handle_tab` now consumes tab context outcomes, but completion behavior is still partial (`PrefixConcat` path is still TODO).
 - Directory completion provider mostly returns entries from current directory; argument/path-specific completion is still marked TODO.
 
@@ -49,7 +49,7 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### Local Working Tree Notes
 
-- Working tree was clean when this snapshot was updated.
+- Current unstaged edits exist in `src/terminal/tab_context.rs`.
 
 ### Suggested Next Steps (Resume Order)
 
@@ -63,6 +63,14 @@ This changelog is intentionally developer-facing. It is meant to help resume wor
 
 ### 2026-03
 
+- Added up/down navigation support inside the tab completion context, extending candidate movement beyond horizontal navigation (3ea218e).
+- Started using completion grid configuration to drive tab-completion layout and navigation behavior (fe4b39b).
+- Added tests for completion grid configuration behavior (5b589b6).
+- Added groundwork for git-aware completion support (#24, 42d008f).
+- Hid the terminal cursor during completion grid writes to reduce redraw artifacts (#23, 7c4f07d).
+- Optimized movement between completion candidates in the tab-completion UI (#22, 88bfbed).
+- Cleaned old TODO items after the tab-completion iteration (#21, 3be4bfc).
+- Added basic tab handling foundation (#15, 19bb886).
 - Implemented tab completion flow for both delimiter-based and prefix-based completion strategies, wiring behavior across completion provider, traits, and terminal integration (1bb0488).
 - Added Home/End key handling for faster line navigation in terminal input (#16, 75410a8).
 - Moved left-cursor utility into shared utils (#17, 3714901).
