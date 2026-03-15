@@ -249,6 +249,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             TabResult::KeyEvent(key_event) => {
                 self.handle_event(stdout, CrosstermTerminalEvent::Key(key_event))?;
             }
+            TabResult::None => {}
         }
 
         Ok(())

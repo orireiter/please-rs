@@ -12,11 +12,11 @@ use crate::commands::traits::{CompletionCandidate, ConcatType};
 
 #[derive(Debug)]
 pub enum TabResult {
+    None,
     AppendText(String),
     KeyEvent(KeyEvent),
 }
 
-#[allow(dead_code)]
 struct CandidatesGridConfig {
     starting_indices: Vec<usize>,
 }
@@ -194,8 +194,10 @@ impl<'a> TabContext<'a> {
                     } // todo specifically handle ctrl c?
                 }
                 CrosstermEvent::Resize(_, _) => {
-                    self.teardown()?;
-                    self.setup()?;
+                    // self.teardown()?;
+                    // self.setup()?;
+                    // todo handle resize
+                    return Ok(TabResult::None);
                 }
                 CrosstermEvent::FocusLost | CrosstermEvent::FocusGained => {
                     continue;
@@ -258,7 +260,7 @@ impl<'a> TabContext<'a> {
                 self.current_selection_index + self.candidates_grid_config.starting_indices.len(),
                 self.current_selection_index,
             )?;
-        }
+        } // todo handle when top/bottom
 
         Ok(())
     }
