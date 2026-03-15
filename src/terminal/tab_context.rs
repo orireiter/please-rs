@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write};
+use std::io::Write;
 
 use anyhow::{Context, Result};
 use crossterm::{
@@ -8,10 +8,7 @@ use crossterm::{
     terminal as crossterm_terminal,
 };
 
-use crate::{
-    commands::traits::{CompletionCandidate, ConcatType},
-    utils::SPACE,
-};
+use crate::commands::traits::{CompletionCandidate, ConcatType};
 
 #[derive(Debug)]
 pub enum TabResult {
@@ -39,7 +36,7 @@ impl<'a> CandidatesGridConfig {
 
 pub struct TabContext<'a> {
     possible_completions: &'a Vec<CompletionCandidate>,
-    completions_position_mapping: HashMap<usize, (u16, u16)>,
+    candidates_grid_config: CandidatesGridConfig,
     current_selection_index: usize,
     current_live_command_latest_arg: &'a str,
     stdout: &'a mut std::io::Stdout,
@@ -50,14 +47,27 @@ impl<'a> TabContext<'a> {
         possible_completions: &'a Vec<CompletionCandidate>,
         current_live_command_latest_arg: &'a str,
         stdout: &'a mut std::io::Stdout,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let candidates_grid_config = Self::get_candidate_grid_config(possible_completions)?;
+
+        Ok(Self {
             possible_completions,
-            completions_position_mapping: HashMap::new(),
+            candidates_grid_config,
             current_selection_index: 0,
             current_live_command_latest_arg,
             stdout,
-        }
+        })
+    }
+
+    fn get_candidate_grid_config(
+        possible_completions: &Vec<CompletionCandidate>,
+    ) -> Result<CandidatesGridConfig> {
+        let terminal_size = crossterm_terminal::size()?;
+        Ok(CandidatesGridConfig::new(
+            terminal_size,
+            possible_completions,
+            None,
+        ))
     }
 
     fn get_stylized_candidate(&self, candidate_index: usize) -> String {
@@ -65,40 +75,53 @@ impl<'a> TabContext<'a> {
 
         if self.current_selection_index == candidate_index {
             format!(
-                "{}{}{}  ",
+                "{}{}{}",
                 Attribute::Reverse,
                 candidate,
                 Attribute::NoReverse
             )
         } else {
-            format!("{}  ", candidate)
+            candidate.to_string()
         }
     }
 
     fn setup(&mut self) -> Result<()> {
-        self.stdout.queue(crossterm_cursor::SavePosition)?;
+        let position = crossterm_cursor::position()?;
+        let mut lines_down = 1;
 
-        let steps_to_eol = self.calc_steps_end_of_line()?;
-        self.stdout.queue(crossterm_cursor::Hide)?;
+        self.stdout
+            .queue(crossterm_cursor::Hide)?
+            .queue(crossterm_cursor::MoveToNextLine(1))?;
 
-        for _ in 0..steps_to_eol {
-            print!("{SPACE}");
-        }
+        let mut current_index = 0;
+        for chunk in self
+            .possible_completions
+            .chunks(self.candidates_grid_config.starting_indices.len())
+        {
+            for (_, position_index) in chunk
+                .iter()
+                .zip(0..self.candidates_grid_config.starting_indices.len())
+            {
+                let new_index =
+                    u16::try_from(self.candidates_grid_config.starting_indices[position_index])?;
+                if new_index > 0 {
+                    self.stdout
+                        .queue(crossterm_cursor::MoveToColumn(new_index))?;
+                }
 
-        self.stdout.flush()?;
+                let stylized_candidate = self.get_stylized_candidate(current_index);
+                print!("{}", stylized_candidate); // todo take in account that maybe an item dropped line
 
-        for i in 0..self.possible_completions.len() {
-            let start_index = crossterm_cursor::position()?;
+                current_index += 1;
+            }
 
-            self.completions_position_mapping.insert(i, start_index);
-
-            let stylized_candidate = self.get_stylized_candidate(i);
-            print!("{}", stylized_candidate);
-            self.stdout.flush()?;
+            self.stdout.queue(crossterm_cursor::MoveToNextLine(1))?;
+            lines_down += 1;
         }
 
         self.stdout
-            .queue(crossterm_cursor::RestorePosition)?
+            .queue(crossterm_cursor::MoveToPreviousLine(lines_down))?
+            .queue(crossterm_cursor::MoveToColumn(position.0))?
             .queue(crossterm_cursor::Show)?
             .flush()?;
 
@@ -108,22 +131,28 @@ impl<'a> TabContext<'a> {
     fn update_selection_style(&mut self, previous_index: usize, new_index: usize) -> Result<()> {
         self.stdout.queue(crossterm_cursor::SavePosition)?;
 
-        let (previous_index_x, previous_index_y) = self
-            .completions_position_mapping
-            .get(&previous_index)
-            .context("failed to get position of previously selected candidate")?;
-        self.stdout.queue(crossterm_cursor::MoveTo(
-            *previous_index_x,
-            *previous_index_y,
-        ))?;
+        let (_, y) = crossterm_cursor::position()?;
+        let items_per_row = self.candidates_grid_config.starting_indices.len();
+        let rows_down: u16 = ((previous_index / items_per_row) + 1).try_into()?;
+        let previous_index_y = y + rows_down;
+
+        let start_index = previous_index % items_per_row;
+        let previous_index_x =
+            self.candidates_grid_config.starting_indices[start_index].try_into()?;
+
+        self.stdout
+            .queue(crossterm_cursor::MoveTo(previous_index_x, previous_index_y))?;
         print!("{}", self.get_stylized_candidate(previous_index));
 
-        let (new_index_x, new_index_y) = self
-            .completions_position_mapping
-            .get(&new_index)
-            .context("failed to get position of new selected candidate")?;
+        let items_per_row = self.candidates_grid_config.starting_indices.len();
+        let rows_down: u16 = ((new_index / items_per_row) + 1).try_into()?;
+        let new_index_y = y + rows_down;
+
+        let start_index = new_index % items_per_row;
+        let new_index_x = self.candidates_grid_config.starting_indices[start_index].try_into()?;
+
         self.stdout
-            .queue(crossterm_cursor::MoveTo(*new_index_x, *new_index_y))?;
+            .queue(crossterm_cursor::MoveTo(new_index_x, new_index_y))?;
         print!("{}", self.get_stylized_candidate(new_index));
 
         self.stdout
@@ -164,10 +193,14 @@ impl<'a> TabContext<'a> {
                         return Ok(TabResult::KeyEvent(key_event));
                     } // todo specifically handle ctrl c?
                 }
+                CrosstermEvent::Resize(_, _) => {
+                    self.teardown()?;
+                    self.setup()?;
+                }
                 CrosstermEvent::FocusLost | CrosstermEvent::FocusGained => {
                     continue;
                 }
-                _ => todo!("{event:?}"),
+                CrosstermEvent::Mouse(_) | CrosstermEvent::Paste(_) => todo!(),
             }
         }
     }
@@ -180,19 +213,19 @@ impl<'a> TabContext<'a> {
         result
     }
 
-    fn calc_steps_end_of_line(&self) -> Result<usize> {
-        let (cursor_x, _) = crossterm_cursor::position()?;
-        let (terminal_size_x, _) = crossterm_terminal::size()?;
-
-        Ok(terminal_size_x.saturating_sub(cursor_x).into())
-    }
-
     fn handle_right(&mut self) -> Result<()> {
         if self.current_selection_index != self.possible_completions.len() - 1 {
             self.current_selection_index += 1;
 
             self.update_selection_style(
                 self.current_selection_index - 1,
+                self.current_selection_index,
+            )?;
+        } else {
+            self.current_selection_index = 0;
+
+            self.update_selection_style(
+                self.possible_completions.len() - 1,
                 self.current_selection_index,
             )?;
         }
@@ -207,6 +240,10 @@ impl<'a> TabContext<'a> {
                 self.current_selection_index + 1,
                 self.current_selection_index,
             )?;
+        } else {
+            self.current_selection_index = self.possible_completions.len() - 1;
+
+            self.update_selection_style(0, self.current_selection_index)?;
         }
 
         Ok(())
