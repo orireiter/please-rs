@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Write};
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
     event::{Event as CrosstermEvent, KeyEvent},
@@ -17,6 +17,24 @@ use crate::{
 pub enum TabResult {
     AppendText(String),
     KeyEvent(KeyEvent),
+}
+
+#[allow(dead_code)]
+struct CandidatesGridConfig {
+    starting_indices: Vec<usize>,
+}
+
+impl<'a> CandidatesGridConfig {
+    const _DEFAULT_MINIMUM_SPACE: usize = 2;
+
+    #[allow(dead_code)]
+    pub fn new(
+        _terminal_size: (u16, u16),
+        _candidates: &'a Vec<CompletionCandidate>,
+        _minimum_space: Option<usize>,
+    ) -> Self {
+        todo!()
+    }
 }
 
 pub struct TabContext<'a> {
@@ -210,5 +228,133 @@ impl<'a> TabContext<'a> {
                 TabResult::AppendText(sliced_string)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CandidatesGridConfig;
+    use crate::commands::traits::{CompletionCandidate, ConcatType};
+
+    fn candidates(values: &[&str]) -> Vec<CompletionCandidate> {
+        values
+            .iter()
+            .map(|value| {
+                CompletionCandidate::new(
+                    (*value).to_string(),
+                    ConcatType::Delimited(" ".to_string()),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn grid_single_line_uses_all_candidates() {
+        let candidates = candidates(&["abc", "de", "fghi"]);
+
+        let config = CandidatesGridConfig::new((40, 20), &candidates, Some(2));
+
+        // Expected printed grid (if this test passes):
+        // abc  de  fghi
+
+        assert_eq!(config.starting_indices, vec![0, 5, 9]);
+    }
+
+    #[test]
+    fn grid_wraps_and_keeps_widest_column_widths() {
+        let candidates = candidates(&["aa", "bb", "longer", "c"]);
+
+        let config = CandidatesGridConfig::new((12, 20), &candidates, Some(2));
+
+        // Expected printed grid (if this test passes):
+        // aa      bb
+        // longer  c
+
+        assert_eq!(config.starting_indices, vec![0, 8]);
+    }
+
+    #[test]
+    fn grid_respects_custom_minimum_spacing() {
+        let candidates = candidates(&["a", "bb", "ccc"]);
+
+        let config = CandidatesGridConfig::new((20, 20), &candidates, Some(4));
+
+        // Expected printed grid (if this test passes):
+        // a    bb    ccc
+
+        assert_eq!(config.starting_indices, vec![0, 5, 11]);
+    }
+
+    #[test]
+    fn grid_empty_candidates_returns_empty_layout() {
+        let candidates = candidates(&[]);
+
+        let config = CandidatesGridConfig::new((20, 20), &candidates, Some(2));
+
+        // Expected printed grid (if this test passes):
+        // [no rows printed]
+
+        assert_eq!(config.starting_indices, vec![]);
+    }
+
+    #[test]
+    fn grid_exact_terminal_fit_stays_single_line() {
+        let candidates = candidates(&["ab", "cd"]);
+
+        let config = CandidatesGridConfig::new((8, 20), &candidates, Some(2));
+
+        // Expected printed grid (if this test passes):
+        // ab  cd
+
+        assert_eq!(config.starting_indices, vec![0, 4]);
+    }
+
+    #[test]
+    fn grid_uses_default_spacing_when_none() {
+        let candidates = candidates(&["a", "bbb"]);
+
+        let config = CandidatesGridConfig::new((20, 20), &candidates, None);
+
+        // Expected printed grid (if this test passes):
+        // a  bbb
+
+        assert_eq!(config.starting_indices, vec![0, 3]);
+    }
+
+    #[test]
+    fn grid_single_candidate_wider_than_terminal_is_still_counted() {
+        let candidates = candidates(&["abcdefghij"]);
+
+        let config = CandidatesGridConfig::new((5, 20), &candidates, Some(2));
+
+        // Expected printed grid (if this test passes):
+        // abcdefghij
+
+        assert_eq!(config.starting_indices, vec![0]);
+    }
+
+    #[test]
+    fn home_case() {
+        let candidates = candidates(&[
+            ".git",
+            ".github",
+            ".gitignore",
+            ".idea",
+            ".pre-commit-config.yaml",
+            ".vscode",
+            "Cargo.lock",
+            "Cargo.toml",
+            "CHANGELOG.md",
+            "README.md",
+            "src",
+            "target",
+        ]);
+
+        let config = CandidatesGridConfig::new((120, 30), &candidates, None);
+
+        assert_eq!(
+            config.starting_indices,
+            vec![0, 6, 15, 27, 34, 59, 68, 80, 92, 106]
+        );
     }
 }
