@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::{
-    ExecutableCommand, cursor as crossterm_cursor, event::Event as CrosstermTerminalEvent,
-    terminal as crossterm_terminal,
+    ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
+    event::Event as CrosstermTerminalEvent, terminal as crossterm_terminal,
 };
 use std::io::Write;
 
@@ -181,7 +181,11 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
                 .min(0),
         )?;
         print!("^C");
-        stdout.flush()?;
+        stdout
+            .queue(crossterm_terminal::Clear(
+                crossterm_terminal::ClearType::FromCursorDown,
+            ))?
+            .flush()?;
 
         self.live_command.user_command.clear();
         self.handle_enter(stdout);
