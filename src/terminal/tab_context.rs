@@ -21,16 +21,104 @@ struct CandidatesGridConfig {
     starting_indices: Vec<usize>,
 }
 
+// todo copilot code to verify
 impl<'a> CandidatesGridConfig {
-    const _DEFAULT_MINIMUM_SPACE: usize = 2;
+    const DEFAULT_MINIMUM_SPACE: usize = 2;
 
-    #[allow(dead_code)]
     pub fn new(
-        _terminal_size: (u16, u16),
-        _candidates: &'a Vec<CompletionCandidate>,
-        _minimum_space: Option<usize>,
+        terminal_size: (u16, u16),
+        candidates: &'a Vec<CompletionCandidate>,
+        minimum_space: Option<usize>,
     ) -> Self {
-        todo!()
+        Self::v4(terminal_size.0.into(), candidates, minimum_space)
+    }
+
+    fn v4(
+        terminal_width: usize,
+        candidates: &'a Vec<CompletionCandidate>,
+        minimum_space: Option<usize>,
+    ) -> Self {
+        if candidates.is_empty() {
+            return Self {
+                starting_indices: Default::default(),
+            };
+        }
+
+        if candidates.len() == 1 {
+            return Self {
+                starting_indices: vec![0],
+            };
+        }
+
+        let minimum_space = minimum_space.unwrap_or(Self::DEFAULT_MINIMUM_SPACE);
+
+        for candidate in candidates {
+            if candidate.value.len() >= terminal_width {
+                return Self {
+                    starting_indices: vec![0],
+                };
+            }
+        }
+
+        for items_per_line in (1..=candidates.len()).rev() {
+            if let Some(starting_indices) =
+                Self::try_layout(terminal_width, candidates, minimum_space, items_per_line)
+            {
+                return Self { starting_indices };
+            }
+        }
+
+        Self {
+            starting_indices: vec![0],
+        }
+    }
+
+    fn try_layout(
+        terminal_width: usize,
+        candidates: &'a [CompletionCandidate],
+        minimum_space: usize,
+        items_per_line: usize,
+    ) -> Option<Vec<usize>> {
+        if items_per_line == 0 {
+            return Some(vec![]);
+        }
+
+        let mut column_widths = vec![0; items_per_line];
+
+        for row in candidates.chunks(items_per_line) {
+            for (column, candidate) in row.iter().enumerate() {
+                column_widths[column] = column_widths[column].max(candidate.value.len());
+            }
+        }
+
+        for row in candidates.chunks(items_per_line) {
+            if row.is_empty() {
+                continue;
+            }
+
+            let mut row_width = 0;
+            let last_column = row.len() - 1;
+
+            for column in column_widths.iter().take(last_column) {
+                row_width += column + minimum_space;
+            }
+
+            row_width += row[last_column].value.len();
+            if row_width > terminal_width {
+                return None;
+            }
+        }
+
+        let mut starting_indices = Vec::with_capacity(items_per_line);
+        starting_indices.push(0);
+
+        let mut current_start = 0;
+        for width in column_widths.iter().take(items_per_line - 1) {
+            current_start += width + minimum_space;
+            starting_indices.push(current_start);
+        }
+
+        Some(starting_indices)
     }
 }
 

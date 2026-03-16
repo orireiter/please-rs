@@ -64,7 +64,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         print!("{}", self.live_command.live_command_prefix());
         if let Err(e) = stdout.flush() {
-            log::error!("failed to flush command preffix after executing user command, error: {e}");
+            log::error!("failed to flush command prefix after executing user command, error: {e}");
         };
 
         command_outcome
