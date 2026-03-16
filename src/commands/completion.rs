@@ -12,8 +12,8 @@ use crate::{
 
 pub fn get_completion_provider(current_command: &str) -> Box<dyn CompletionProvider> {
     // todo make the ordering configurable
-    let providers: [Box<dyn CompletionProvider>; 2] = [
-        Box::new(GitCompletionProvider),
+    let providers: [Box<dyn CompletionProvider>; 1] = [
+        // Box::new(GitCompletionProvider),
         Box::new(DirectoryCompletionProvider),
     ];
 
@@ -97,8 +97,10 @@ impl CompletionProvider for DirectoryCompletionProvider {
     }
 }
 
+#[allow(dead_code)]
 struct GitCompletionProvider;
 
+#[allow(dead_code)]
 impl GitCompletionProvider {
     pub const GIT: &str = "git";
 }

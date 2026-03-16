@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor as crossterm_cursor,
     event::Event as CrosstermTerminalEvent, terminal as crossterm_terminal,
@@ -64,7 +64,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         print!("{}", self.live_command.live_command_prefix());
         if let Err(e) = stdout.flush() {
-            log::error!("failed to flush command preffix after executing user command, error: {e}");
+            log::error!("failed to flush command prefix after executing user command, error: {e}");
         };
 
         command_outcome
@@ -235,7 +235,8 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         let latest_word = self.live_command.get_latest_word();
         let mut tab_context_runner =
-            tab_context::TabContext::new(&possible_completions, &latest_word, stdout);
+            tab_context::TabContext::new(&possible_completions, &latest_word, stdout)
+                .context("failed creating tab context")?;
 
         let tab_outcome = tab_context_runner.run()?;
 
@@ -248,6 +249,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             TabResult::KeyEvent(key_event) => {
                 self.handle_event(stdout, CrosstermTerminalEvent::Key(key_event))?;
             }
+            TabResult::None => {}
         }
 
         Ok(())
