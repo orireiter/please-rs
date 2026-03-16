@@ -34,6 +34,10 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
     fn handle_enter(&mut self, stdout: &mut std::io::Stdout) -> CommandOutcome {
         let attempted_command = self.live_command.user_command_as_string();
 
+        if let Err(e) = self.handle_end(stdout) {
+            log::warn!("failed moving to end before executing command, error: {e}")
+        };
+
         println!();
         if let Err(e) = stdout.flush() {
             log::error!("failed to flush newline before executing user command, error: {e}");
@@ -197,7 +201,11 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
     }
 
     fn handle_end(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let steps_right = self.live_command.user_command_as_string().len() - self.cursor_position;
+        let steps_right = self
+            .live_command
+            .user_command_as_string()
+            .len()
+            .saturating_sub(self.cursor_position);
 
         self.move_cursor_right(stdout, steps_right)
     }
@@ -379,6 +387,8 @@ impl PleaseTerminal {
     }
 
     fn write_command_suffix(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+        let initial_position = crossterm_cursor::position()?;
+
         let suffix = &self.live_command.user_command_as_string()[self.cursor_position..];
         if !suffix.is_empty() {
             print!("{suffix}");
@@ -393,6 +403,8 @@ impl PleaseTerminal {
             you will continue writing at the end of the line instead of going down a row.
             So not clearing in that case.
         */
+        self.cursor_position = self.live_command.user_command.len();
+        let mut left_steps = suffix.len().saturating_sub(1);
         if let Ok(position) = crossterm_cursor::position()
             && let Ok(size) = crossterm_terminal::size()
         {
@@ -400,6 +412,13 @@ impl PleaseTerminal {
                 stdout.execute(crossterm_terminal::Clear(
                     crossterm_terminal::ClearType::FromCursorDown,
                 ))?;
+            } else if suffix.len() > 1
+                && initial_position.0 as usize + suffix.len() == size.0 as usize
+            {
+                print!(" ");
+                stdout.flush()?;
+                left_steps += 1;
+                self.cursor_position += 1;
             }
         } else {
             log::warn!(
@@ -408,8 +427,6 @@ impl PleaseTerminal {
         }
 
         // since the print sends the actual cursor to the end, we rewind it
-        self.cursor_position = self.live_command.user_command.len();
-        let left_steps = suffix.len().saturating_sub(1);
         self.move_cursor_left(stdout, left_steps)?;
 
         Ok(())

@@ -198,7 +198,7 @@ impl<'a> TabContext<'a> {
                 }
 
                 let stylized_candidate = self.get_stylized_candidate(current_index);
-                print!("{}", stylized_candidate); // todo take in account that maybe an item dropped line
+                print!("{}", stylized_candidate);
 
                 current_index += 1;
             }
