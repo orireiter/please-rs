@@ -385,6 +385,8 @@ impl PleaseTerminal {
             stdout.flush()?;
         }
 
+        // todo - Handle bug where attempting to add new line if cursor is not at the end of the command, check backspace as well.
+
         /*
             The way that clearing the screen works is such that:
             If you're exactly at the end of the line and clear,
