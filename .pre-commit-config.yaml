@@ -33,3 +33,10 @@ repos:
       args: ["--all-targets", "--", "-D", "warnings"]
       types: [rust]
       pass_filenames: false
+    - id: tests
+      name: tests
+      description: Run tests
+      entry: cargo test
+      language: system
+      types: [rust]
+      pass_filenames: false
