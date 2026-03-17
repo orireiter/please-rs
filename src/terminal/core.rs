@@ -14,7 +14,7 @@ use crate::{
         tab_context::{self, TabResult},
         traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
     },
-    utils::{self, SPACE},
+    utils,
 };
 
 enum TerminalLoopEvent {
@@ -102,9 +102,9 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             self.move_cursor_left(stdout, 1)?;
         }
 
-        print!("{}", SPACE.repeat(steps));
-        self.cursor_position += steps;
-        self.move_cursor_left(stdout, steps)?;
+        stdout.execute(crossterm_terminal::Clear(
+            crossterm_terminal::ClearType::FromCursorDown,
+        ))?;
 
         // not sure why but if the backspace is not from at the end, we need an extra backspace
         let early_position = self.cursor_position;
@@ -415,6 +415,7 @@ impl PleaseTerminal {
             } else if suffix.len() > 1
                 && initial_position.0 as usize + suffix.len() == size.0 as usize
             {
+                // handle edge case where at end of line and still staying instead of moving to next
                 print!(" ");
                 stdout.flush()?;
                 left_steps += 1;
