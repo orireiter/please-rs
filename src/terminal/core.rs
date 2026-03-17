@@ -83,7 +83,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             return Ok(());
         }
 
-        stdout.execute(crossterm_cursor::DisableBlinking)?;
+        stdout.execute(crossterm_cursor::Hide)?;
 
         let steps = if key_event
             .modifiers
@@ -118,7 +118,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
         self.history_pattern_position = self.cursor_position;
         self.history.reset_history_search_index();
 
-        stdout.execute(crossterm_cursor::EnableBlinking)?;
+        stdout.execute(crossterm_cursor::Show)?;
 
         Ok(())
     }
