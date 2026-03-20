@@ -18,7 +18,7 @@ use crate::{
 };
 
 enum TerminalLoopEvent {
-    Contiue,
+    Continue,
     Exit,
 }
 
@@ -303,7 +303,7 @@ impl PleaseTerminal {
         match event {
             CrosstermTerminalEvent::Key(key_event) => {
                 if !key_event.is_press() {
-                    return Ok(TerminalLoopEvent::Contiue);
+                    return Ok(TerminalLoopEvent::Continue);
                 }
 
                 if let Some(new_char) = self.get_char_from_key_event(key_event) {
@@ -332,11 +332,11 @@ impl PleaseTerminal {
                     self.handle_end(stdout)?;
                 }
 
-                Ok(TerminalLoopEvent::Contiue)
+                Ok(TerminalLoopEvent::Continue)
             }
             CrosstermTerminalEvent::FocusGained
             | CrosstermTerminalEvent::FocusLost
-            | CrosstermTerminalEvent::Resize(_, _) => Ok(TerminalLoopEvent::Contiue),
+            | CrosstermTerminalEvent::Resize(_, _) => Ok(TerminalLoopEvent::Continue),
             CrosstermTerminalEvent::Mouse(_) => todo!(),
             CrosstermTerminalEvent::Paste(_) => todo!(),
         }
@@ -494,8 +494,6 @@ impl PleaseTerminal {
                     .len()
                     .saturating_sub(self.cursor_position),
             )?;
-
-            stdout.execute(crossterm_cursor::Show)?;
         }
 
         stdout.execute(crossterm_cursor::Show)?;
