@@ -1,7 +1,7 @@
 use std::env::{self, current_dir};
 use std::io::Write;
-use std::process;
-use std::str::SplitWhitespace;
+use std::str::{FromStr, SplitWhitespace};
+use std::{path, process};
 
 use anyhow::{Context, Result};
 
@@ -93,7 +93,7 @@ const RESERVED_CMD_COMMANDS: [&str; 82] = [
     "XCOPY",
     "WMIC",
 ];
-const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 3] = ["", ".exe", ".bat"];
+const KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS: [&str; 4] = ["exe", "bat", "cmd", ""];
 
 const PATH_ENV_VAR: &str = "PATH";
 const PATH_ENV_VAR_DELIMITER: &str = ";";
@@ -192,10 +192,15 @@ impl LiveCommand {
         let path_values = env::var(PATH_ENV_VAR)?;
 
         for possible_path in path_values.split(PATH_ENV_VAR_DELIMITER) {
-            let temp_executable_path = format!("{possible_path}\\{executable}");
+            let possible_env_path = path::PathBuf::from_str(possible_path);
+            let mut temp_executable_path = match possible_env_path {
+                Ok(env_path) => env_path.join(executable),
+                Err(_) => continue,
+            };
 
             for file_extension in KNOWN_CMD_EXECUTABLE_FILE_EXTENSIONS {
-                if std::fs::metadata(format!("{temp_executable_path}{file_extension}")).is_ok() {
+                temp_executable_path.set_extension(file_extension);
+                if temp_executable_path.metadata().is_ok() {
                     return Ok(process::Command::new(temp_executable_path));
                 }
             }
