@@ -249,6 +249,11 @@ impl LiveCommand {
 
         self.user_command[start..].iter().collect()
     }
+
+    #[allow(dead_code)]
+    pub fn get_full_len(&self) -> usize {
+        self.live_command_prefix().len() + self.user_command.len()
+    }
 }
 
 trait CommandExecution {
