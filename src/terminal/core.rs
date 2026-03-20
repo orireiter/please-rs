@@ -13,12 +13,13 @@ use crate::{
     terminal::{
         tab_context::{self, TabResult},
         traits::{self as terminal_traits, IsKeyEvents, KeyHandling},
+        types::EditEvent,
     },
-    utils::{self, SPACE},
+    utils,
 };
 
 enum TerminalLoopEvent {
-    Contiue,
+    Continue,
     Exit,
 }
 
@@ -83,7 +84,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             return Ok(());
         }
 
-        stdout.execute(crossterm_cursor::DisableBlinking)?;
+        stdout.execute(crossterm_cursor::Hide)?;
 
         let steps = if key_event
             .modifiers
@@ -102,23 +103,16 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
             self.move_cursor_left(stdout, 1)?;
         }
 
-        print!("{}", SPACE.repeat(steps));
-        self.cursor_position += steps;
-        self.move_cursor_left(stdout, steps)?;
+        stdout.execute(crossterm_terminal::Clear(
+            crossterm_terminal::ClearType::FromCursorDown,
+        ))?;
 
-        // not sure why but if the backspace is not from at the end, we need an extra backspace
-        let early_position = self.cursor_position;
-
-        self.write_command_suffix(stdout)?;
-
-        if early_position != self.live_command.user_command.len() {
-            self.move_cursor_left(stdout, 1)?;
-        }
+        self.write_command_suffix(stdout, EditEvent::Deletion)?;
 
         self.history_pattern_position = self.cursor_position;
         self.history.reset_history_search_index();
 
-        stdout.execute(crossterm_cursor::EnableBlinking)?;
+        stdout.execute(crossterm_cursor::Show)?;
 
         Ok(())
     }
@@ -303,7 +297,7 @@ impl PleaseTerminal {
         match event {
             CrosstermTerminalEvent::Key(key_event) => {
                 if !key_event.is_press() {
-                    return Ok(TerminalLoopEvent::Contiue);
+                    return Ok(TerminalLoopEvent::Continue);
                 }
 
                 if let Some(new_char) = self.get_char_from_key_event(key_event) {
@@ -332,11 +326,11 @@ impl PleaseTerminal {
                     self.handle_end(stdout)?;
                 }
 
-                Ok(TerminalLoopEvent::Contiue)
+                Ok(TerminalLoopEvent::Continue)
             }
             CrosstermTerminalEvent::FocusGained
             | CrosstermTerminalEvent::FocusLost
-            | CrosstermTerminalEvent::Resize(_, _) => Ok(TerminalLoopEvent::Contiue),
+            | CrosstermTerminalEvent::Resize(_, _) => Ok(TerminalLoopEvent::Continue),
             CrosstermTerminalEvent::Mouse(_) => todo!(),
             CrosstermTerminalEvent::Paste(_) => todo!(),
         }
@@ -366,7 +360,7 @@ impl PleaseTerminal {
             .insert(self.cursor_position, new_char);
 
         stdout.execute(crossterm_cursor::Hide)?;
-        self.write_command_suffix(stdout)?;
+        self.write_command_suffix(stdout, EditEvent::Addition)?;
         stdout.execute(crossterm_cursor::Show)?;
 
         self.history_pattern_position = self.cursor_position;
@@ -386,7 +380,11 @@ impl PleaseTerminal {
         Ok(())
     }
 
-    fn write_command_suffix(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn write_command_suffix(
+        &mut self,
+        stdout: &mut std::io::Stdout,
+        edit_event: EditEvent,
+    ) -> Result<()> {
         let initial_position = crossterm_cursor::position()?;
 
         let suffix = &self.live_command.user_command_as_string()[self.cursor_position..];
@@ -395,35 +393,60 @@ impl PleaseTerminal {
             stdout.flush()?;
         }
 
-        // todo - Handle bug where attempting to add new line if cursor is not at the end of the command, check backspace as well.
+        let cursor_position_x: usize = crossterm_cursor::position()
+            .context("failed to get cursor position to write command suffix")?
+            .0
+            .into();
+        let terminal_size_x: usize = crossterm_terminal::size()
+            .context("failed to get terminal to write command suffix")?
+            .0
+            .into();
 
-        /*
-            The way that clearing the screen works is such that:
-            If you're exactly at the end of the line and clear,
-            you will continue writing at the end of the line instead of going down a row.
-            So not clearing in that case.
-        */
-        self.cursor_position = self.live_command.user_command.len();
-        let mut left_steps = suffix.len().saturating_sub(1);
-        if let Ok(position) = crossterm_cursor::position()
-            && let Ok(size) = crossterm_terminal::size()
-        {
-            if position.0 + 1 != size.0 {
+        if edit_event == EditEvent::Deletion {
+            if cursor_position_x + 1 != terminal_size_x {
                 stdout.execute(crossterm_terminal::Clear(
                     crossterm_terminal::ClearType::FromCursorDown,
                 ))?;
-            } else if suffix.len() > 1
-                && initial_position.0 as usize + suffix.len() == size.0 as usize
-            {
-                print!(" ");
-                stdout.flush()?;
-                left_steps += 1;
-                self.cursor_position += 1;
+
+                for _ in 0..suffix.len() {
+                    utils::move_left(stdout)?;
+                }
+            } else {
+                let full_len = self.live_command.get_full_len();
+                if full_len == terminal_size_x {
+                    print!(" ");
+                    stdout.flush()?;
+                    for _ in 0..2 {
+                        utils::move_left(stdout)?;
+                    }
+                } else if full_len + 1 != terminal_size_x
+                    || self.cursor_position + 1 == self.live_command.user_command.len()
+                {
+                    // 12345678 -> 1234567 -> 123456
+                    // 12345678 -> 1234568 -> 123458
+                    // 1234567  -> 123456  -> 12345
+                    // 1234567  -> 123457  -> 12347
+
+                    utils::move_left(stdout)?
+                }
             }
-        } else {
-            log::warn!(
-                "failed to get cursor position and terminal size to determine whether need to clear from cursor down"
-            )
+
+            return Ok(());
+        }
+
+        self.cursor_position = self.live_command.user_command.len();
+        let mut left_steps = suffix.len().saturating_sub(1);
+
+        if cursor_position_x + 1 != terminal_size_x || edit_event == EditEvent::History {
+            stdout.execute(crossterm_terminal::Clear(
+                crossterm_terminal::ClearType::FromCursorDown,
+            ))?;
+        } else if initial_position.0 as usize + suffix.len() == terminal_size_x as usize {
+            // handle edge case where at end of line and still staying instead of moving to next
+            print!(" ");
+            stdout.flush()?;
+            left_steps += 1;
+            self.cursor_position += 1;
         }
 
         // since the print sends the actual cursor to the end, we rewind it
@@ -485,7 +508,7 @@ impl PleaseTerminal {
                     .len()
                     .saturating_sub(current_history_pattern.len()),
             )?;
-            self.write_command_suffix(stdout)?;
+            self.write_command_suffix(stdout, EditEvent::History)?;
             self.move_cursor_right(
                 stdout,
                 self.live_command
@@ -493,8 +516,6 @@ impl PleaseTerminal {
                     .len()
                     .saturating_sub(self.cursor_position),
             )?;
-
-            stdout.execute(crossterm_cursor::Show)?;
         }
 
         stdout.execute(crossterm_cursor::Show)?;
