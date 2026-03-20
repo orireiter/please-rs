@@ -177,9 +177,8 @@ impl<'a> TabContext<'a> {
         let position = crossterm_cursor::position()?;
         let mut lines_down = 1;
 
-        self.stdout
-            .queue(crossterm_cursor::Hide)?
-            .queue(crossterm_cursor::MoveToNextLine(1))?;
+        self.stdout.queue(crossterm_cursor::Hide)?;
+        println!();
 
         let mut current_index = 0;
         for chunk in self
@@ -203,7 +202,7 @@ impl<'a> TabContext<'a> {
                 current_index += 1;
             }
 
-            self.stdout.queue(crossterm_cursor::MoveToNextLine(1))?;
+            println!();
             lines_down += 1;
         }
 
