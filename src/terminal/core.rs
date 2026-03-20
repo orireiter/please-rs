@@ -244,9 +244,7 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
 
         match tab_outcome {
             TabResult::AppendText(text) => {
-                for new_char in text.chars() {
-                    self.handle_char_added(stdout, new_char)?;
-                }
+                self.handle_string_added(stdout, &text)?;
             }
             TabResult::KeyEvent(key_event) => {
                 self.handle_event(stdout, CrosstermTerminalEvent::Key(key_event))?;
