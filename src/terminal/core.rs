@@ -278,9 +278,9 @@ impl terminal_traits::IsKeyEvents for PleaseTerminal {
 }
 
 impl PleaseTerminal {
-    pub fn new(history: history::History) -> Self {
+    pub fn new(history: history::History, command_manager: LiveCommand) -> Self {
         Self {
-            live_command: LiveCommand::new(),
+            live_command: command_manager,
             history,
             cursor_position: 0,
             history_pattern_position: 0,

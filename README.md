@@ -18,3 +18,4 @@
 11. Add installation support to make usage easier
 12. Allow marking text with shift+arrow
 13. BUG - Handle bug where attempting to add new line if cursor is not at the end of the command, check backspace as well.
+14. handle env vars before executable in command

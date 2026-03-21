@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
+use std::io::Write;
 use std::path::PathBuf;
-use std::{cmp::min, io::Write};
 
 use anyhow::{Context, Result};
 
-const DEFAULT_MAX_PERSISTENT_SIZE: isize = 1_000;
+const DEFAULT_MAX_PERSISTENT_SIZE: usize = 1_000;
 const DEFAULT_PERSISTENT_FILE_NAME: &str = ".please_history";
 
 pub enum Direction {
@@ -12,9 +12,10 @@ pub enum Direction {
     Next,
 }
 
+#[derive(Clone)]
 pub struct HistoryConfig {
     persistent_file: PathBuf,
-    max_commands_in_persistent_file: isize,
+    max_commands_in_persistent_file: usize,
 }
 
 impl Default for HistoryConfig {
@@ -55,13 +56,10 @@ impl History {
     pub fn save_history_to_persistent_file(&self) -> Result<()> {
         let mut file = std::fs::File::create(&self.config.persistent_file)?;
 
-        let mut command_count = self.cached_history.len();
-        if self.config.max_commands_in_persistent_file.is_positive() {
-            command_count = min(
-                command_count,
-                self.config.max_commands_in_persistent_file as usize,
-            );
-        }
+        let command_count = self
+            .cached_history
+            .len()
+            .min(self.config.max_commands_in_persistent_file);
 
         for index in 0..command_count {
             let command = &self.cached_history[index];
