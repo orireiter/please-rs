@@ -13,7 +13,7 @@ fn main() -> Result<()> {
 
     utils::init_terminal()?;
 
-    let config = PleaseConfig::default();
+    let config = PleaseConfig::get_from_filesystem();
     let history_object = history::History::from_config(config.history)?;
     let command_object = commands::LiveCommand::from_config(config.command);
 

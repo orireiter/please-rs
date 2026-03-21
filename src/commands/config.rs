@@ -1,9 +1,11 @@
-#[derive(Default, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct CommandConfig {
     pub prefix_config: Option<CommandPrefixConfig>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandPrefixConfig {
     pub prefix_to_command_delimiter: String,
     pub prefix_elements_delimiter: String,

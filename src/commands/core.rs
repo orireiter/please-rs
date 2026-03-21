@@ -1,11 +1,12 @@
-use std::env::{self, current_dir};
+use std::env::{self};
 use std::io::Write;
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
 
 use anyhow::{Context, Result};
 
-use crate::commands::config::{CommandConfig, CommandPrefixConfig};
+use crate::commands::config::CommandConfig;
+use crate::commands::prefix::LiveCommandPrefix;
 use crate::utils::SPACE;
 
 const CMD: &str = "cmd";
@@ -257,36 +258,6 @@ impl LiveCommand {
     }
 
     // todo handle env vars before executable
-}
-
-#[derive(Default)]
-pub struct LiveCommandPrefix {
-    live_command_prefix_conf: CommandPrefixConfig,
-}
-
-impl LiveCommandPrefix {
-    pub fn new(config: Option<CommandPrefixConfig>) -> Self {
-        Self {
-            live_command_prefix_conf: config.unwrap_or_default(),
-        }
-    }
-
-    pub fn get_command_prefix(&self) -> String {
-        let prefix_elements = self.build_elements();
-        let prefix_elements_string =
-            prefix_elements.join(&self.live_command_prefix_conf.prefix_elements_delimiter);
-
-        prefix_elements_string + &self.live_command_prefix_conf.prefix_to_command_delimiter
-    }
-
-    fn build_elements(&self) -> Vec<String> {
-        let dir_part = match current_dir() {
-            Ok(dir) => dir.display().to_string(),
-            Err(e) => format!("<error: {e}>"),
-        };
-
-        vec![dir_part]
-    }
 }
 
 trait CommandExecution {

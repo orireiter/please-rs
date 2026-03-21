@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_MAX_PERSISTENT_SIZE: usize = 1_000;
 const DEFAULT_PERSISTENT_FILE_NAME: &str = ".please_history";
@@ -12,7 +13,7 @@ pub enum Direction {
     Next,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HistoryConfig {
     persistent_file: PathBuf,
     max_commands_in_persistent_file: usize,
