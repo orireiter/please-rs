@@ -1,8 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CommandConfig {
     pub prefix_config: Option<CommandPrefixConfig>,
+}
+
+impl Default for CommandConfig {
+    fn default() -> Self {
+        Self {
+            prefix_config: Some(CommandPrefixConfig::default()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
