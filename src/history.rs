@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_MAX_PERSISTENT_SIZE: usize = 1_000;
@@ -13,7 +14,7 @@ pub enum Direction {
     Next,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HistoryConfig {
     persistent_file: PathBuf,
     max_commands_in_persistent_file: usize,

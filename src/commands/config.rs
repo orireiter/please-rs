@@ -1,6 +1,7 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommandConfig {
     pub prefix_config: Option<CommandPrefixConfig>,
 }
@@ -13,7 +14,7 @@ impl Default for CommandConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommandPrefixConfig {
     pub prefix_to_command_delimiter: String,
     pub prefix_elements_delimiter: String,

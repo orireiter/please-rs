@@ -4,11 +4,12 @@ use std::{
     io::BufWriter,
 };
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{commands::config::CommandConfig, history::HistoryConfig};
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct PleaseConfig {
     pub command: CommandConfig,
     pub history: HistoryConfig,
