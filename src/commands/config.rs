@@ -37,6 +37,7 @@ impl Default for CommandPrefixConfig {
 }
 
 pub mod prefix_elements {
+    use crossterm::style::Color;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
 
@@ -48,10 +49,20 @@ pub mod prefix_elements {
         KeyValue(String),
     }
 
+    fn default_color() -> Color {
+        Color::White
+    }
+
+    const PATTERN: &str = "^#.*|rgb_\\(\\d{1,3},\\d{1,3},\\d{1,3}\\)|Black|DarkGrey|Red|DarkRed|Green|DarkGreen|Yellow|DarkYellow|Blue|DarkBlue|Magenta|DarkMagenta|Cyan|DarkCyan|White|Grey";
+
     #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
     pub struct ElementConfig {
         pub display_parts: PrefixElementDisplayParts,
         pub key_value_delimiter: Option<String>,
+
+        #[serde(default = "default_color")]
+        #[schemars(with = "String", regex(pattern = PATTERN))]
+        pub color: Color,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

@@ -1,3 +1,5 @@
+use crossterm::style::Stylize;
+
 use crate::commands::{
     config::{
         CommandPrefixConfig,
@@ -163,4 +165,6 @@ fn stylize_element_value(value: &str, display_config: &ElementConfig) -> String 
         .unwrap_or_default();
 
     format!("{key}{key_value_delimiter}{value}")
+        .with(display_config.color)
+        .to_string()
 }
