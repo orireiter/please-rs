@@ -18,7 +18,7 @@ impl Default for CommandConfig {
 pub struct CommandPrefixConfig {
     pub prefix_to_command_delimiter: String,
     pub prefix_elements_delimiter: String,
-    pub _elements: Vec<String>,
+    pub elements: Vec<prefix_elements::PrefixElementConfig>,
 }
 
 impl CommandPrefixConfig {
@@ -31,7 +31,41 @@ impl Default for CommandPrefixConfig {
         Self {
             prefix_to_command_delimiter: Self::COMMAND_TO_PREFIX_DELIMITER.to_string(),
             prefix_elements_delimiter: Self::PREFIX_ELEMENTS_DELIMITER.to_string(),
-            _elements: Default::default(),
+            elements: Default::default(),
         }
+    }
+}
+
+pub mod prefix_elements {
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
+
+    pub type PrefixElementConfig = (PrefixElement, ElementConfig);
+
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    pub enum PrefixElementDisplayParts {
+        ValueOnly,
+        KeyValue(String),
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    pub struct ElementConfig {
+        pub display_parts: PrefixElementDisplayParts,
+        pub key_value_delimiter: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    pub enum PrefixElement {
+        Dir(DirType),
+        Git,
+        Custom(),
+    }
+
+    #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    pub enum DirType {
+        Full,
+        Shortened,
+        HomeRelative,
+        CurrentOnly,
     }
 }
