@@ -106,3 +106,124 @@ pub mod prefix_elements {
         CurrentOnly,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crossterm::style::Color;
+    use serde_json::json;
+
+    use crate::commands::config::{
+        CommandPrefixConfig, DelimiterConfig,
+        prefix_elements::{DirType, ElementConfig, PrefixElement, PrefixElementDisplayParts},
+    };
+
+    use super::CommandConfig;
+
+    #[test]
+    fn deserialize_delimiter_config_applies_default_color() {
+        let cfg: DelimiterConfig =
+            serde_json::from_value(json!({ "delimiter": " | " })).expect("valid delimiter");
+
+        assert_eq!(cfg.delimiter, " | ");
+        assert_eq!(cfg.color, Color::White);
+    }
+
+    #[test]
+    fn deserialize_prefix_config_from_please_config_style_json() {
+        let cfg: CommandPrefixConfig = serde_json::from_value(json!({
+            "prefix_to_command_delimiter": { "delimiter": " -> ", "color": "#963def" },
+            "prefix_elements_delimiter": { "delimiter": " | ", "color": "dark_green" },
+            "elements": [
+                [
+                    { "Dir": "Full" },
+                    { "display_parts": "ValueOnly" }
+                ],
+                [
+                    "Git",
+                    { "display_parts": "ValueOnly", "color": "green" }
+                ],
+            ]
+        }))
+        .expect("valid prefix config");
+
+        assert_eq!(cfg.prefix_to_command_delimiter.delimiter, " -> ");
+        assert_eq!(
+            cfg.prefix_to_command_delimiter.color,
+            Color::Rgb {
+                r: 150,
+                g: 61,
+                b: 239
+            }
+        );
+        assert_eq!(cfg.prefix_elements_delimiter.delimiter, " | ");
+        assert_eq!(cfg.prefix_elements_delimiter.color, Color::DarkGreen);
+        assert_eq!(cfg.elements.len(), 2);
+
+        let (first_kind, first_display) = &cfg.elements[0];
+        assert!(matches!(first_kind, PrefixElement::Dir(DirType::Full)));
+        assert!(matches!(
+            first_display.display_parts,
+            PrefixElementDisplayParts::ValueOnly
+        ));
+        assert_eq!(first_display.key_value_delimiter, None);
+        assert_eq!(first_display.color, Color::White);
+
+        let (second_kind, second_display) = &cfg.elements[1];
+        assert!(matches!(second_kind, PrefixElement::Git));
+        assert!(matches!(
+            second_display.display_parts,
+            PrefixElementDisplayParts::ValueOnly
+        ));
+        assert_eq!(second_display.color, Color::Green);
+    }
+
+    #[test]
+    fn serialize_command_config_emits_expected_json_shape() {
+        let command_cfg = CommandConfig {
+            prefix_config: Some(CommandPrefixConfig {
+                prefix_to_command_delimiter: DelimiterConfig {
+                    delimiter: " => ".to_string(),
+                    color: Color::Blue,
+                },
+                prefix_elements_delimiter: DelimiterConfig {
+                    delimiter: " / ".to_string(),
+                    color: Color::DarkCyan,
+                },
+                elements: vec![(
+                    PrefixElement::Dir(DirType::CurrentOnly),
+                    ElementConfig {
+                        display_parts: PrefixElementDisplayParts::KeyValue("cwd".to_string()),
+                        key_value_delimiter: Some("=".to_string()),
+                        color: Color::Yellow,
+                    },
+                )],
+            }),
+        };
+
+        let serialized = serde_json::to_value(command_cfg).expect("config should serialize");
+        let expected = json!({
+            "prefix_config": {
+                "prefix_to_command_delimiter": {
+                    "delimiter": " => ",
+                    "color": "blue"
+                },
+                "prefix_elements_delimiter": {
+                    "delimiter": " / ",
+                    "color": "dark_cyan"
+                },
+                "elements": [
+                    [
+                        { "Dir": "CurrentOnly" },
+                        {
+                            "display_parts": { "KeyValue": "cwd" },
+                            "key_value_delimiter": "=",
+                            "color": "yellow"
+                        }
+                    ]
+                ]
+            }
+        });
+
+        assert_eq!(serialized, expected);
+    }
+}
