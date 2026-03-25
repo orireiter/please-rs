@@ -1,11 +1,12 @@
-use crossterm::style::Stylize;
-
 use crate::commands::{
     config::{
         CommandPrefixConfig,
-        prefix_elements::{DirType, ElementConfig, PrefixElementDisplayParts},
+        prefix_elements::{DirType, ElementConfig},
     },
-    prefix::element_builder::{PrefixElementBuilder, dir::DirPrefixElement},
+    prefix::{
+        element_builder::{PrefixElementBuilder, dir::DirPrefixElement},
+        style::{stylize_delimiter, stylize_element_value},
+    },
 };
 
 #[derive(Default)]
@@ -35,10 +36,14 @@ impl LiveCommandPrefix {
 
     pub fn get_command_prefix(&self) -> String {
         let prefix_elements = self.build_elements();
-        let prefix_elements_string =
-            prefix_elements.join(&self.live_command_prefix_conf.prefix_elements_delimiter);
+        let elements_delimiter =
+            stylize_delimiter(&self.live_command_prefix_conf.prefix_elements_delimiter);
 
-        prefix_elements_string + &self.live_command_prefix_conf.prefix_to_command_delimiter
+        let prefix_elements_string = prefix_elements.join(&elements_delimiter);
+
+        let command_delimiter =
+            stylize_delimiter(&self.live_command_prefix_conf.prefix_to_command_delimiter);
+        prefix_elements_string + &command_delimiter
     }
 
     fn build_elements(&self) -> Vec<String> {
@@ -153,18 +158,35 @@ mod element_builder {
     }
 }
 
-fn stylize_element_value(value: &str, display_config: &ElementConfig) -> String {
-    let key = match &display_config.display_parts {
-        PrefixElementDisplayParts::KeyValue(key) => key,
-        _ => "",
+mod style {
+    use crossterm::style::Stylize;
+
+    use crate::commands::config::{
+        DelimiterConfig,
+        prefix_elements::{ElementConfig, PrefixElementDisplayParts},
     };
 
-    let key_value_delimiter = display_config
-        .key_value_delimiter
-        .as_deref()
-        .unwrap_or_default();
+    pub fn stylize_element_value(value: &str, display_config: &ElementConfig) -> String {
+        let key = match &display_config.display_parts {
+            PrefixElementDisplayParts::KeyValue(key) => key,
+            _ => "",
+        };
 
-    format!("{key}{key_value_delimiter}{value}")
-        .with(display_config.color)
-        .to_string()
+        let key_value_delimiter = display_config
+            .key_value_delimiter
+            .as_deref()
+            .unwrap_or_default();
+
+        format!("{key}{key_value_delimiter}{value}")
+            .with(display_config.color)
+            .to_string()
+    }
+
+    pub fn stylize_delimiter(delimiter_config: &DelimiterConfig) -> String {
+        delimiter_config
+            .delimiter
+            .clone()
+            .with(delimiter_config.color)
+            .to_string()
+    }
 }

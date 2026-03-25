@@ -1,5 +1,12 @@
+use crossterm::style::Color;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+const PATTERN: &str = "^#.*|rgb_\\(\\d{1,3},\\d{1,3},\\d{1,3}\\)|black|dark_grey|red|dark_red|green|dark_green|yellow|dark_yellow|blue|dark_blue|magenta|dark_magenta|cyan|dark_cyan|white|grey";
+
+fn default_color() -> Color {
+    Color::White
+}
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommandConfig {
@@ -15,9 +22,26 @@ impl Default for CommandConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DelimiterConfig {
+    pub delimiter: String,
+
+    #[serde(default = "default_color")]
+    #[schemars(with = "String", regex(pattern = PATTERN))]
+    pub color: Color,
+}
+
+impl DelimiterConfig {
+    pub fn new(delimiter: Option<String>, color: Option<Color>) -> Self {
+        Self {
+            delimiter: delimiter.unwrap_or_default(),
+            color: color.unwrap_or_else(default_color),
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommandPrefixConfig {
-    pub prefix_to_command_delimiter: String,
-    pub prefix_elements_delimiter: String,
+    pub prefix_to_command_delimiter: DelimiterConfig,
+    pub prefix_elements_delimiter: DelimiterConfig,
     pub elements: Vec<prefix_elements::PrefixElementConfig>,
 }
 
@@ -29,8 +53,14 @@ impl CommandPrefixConfig {
 impl Default for CommandPrefixConfig {
     fn default() -> Self {
         Self {
-            prefix_to_command_delimiter: Self::COMMAND_TO_PREFIX_DELIMITER.to_string(),
-            prefix_elements_delimiter: Self::PREFIX_ELEMENTS_DELIMITER.to_string(),
+            prefix_to_command_delimiter: DelimiterConfig::new(
+                Some(Self::COMMAND_TO_PREFIX_DELIMITER.to_string()),
+                None,
+            ),
+            prefix_elements_delimiter: DelimiterConfig::new(
+                Some(Self::PREFIX_ELEMENTS_DELIMITER.to_string()),
+                None,
+            ),
             elements: Default::default(),
         }
     }
@@ -41,6 +71,8 @@ pub mod prefix_elements {
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
 
+    use crate::commands::config::{PATTERN, default_color};
+
     pub type PrefixElementConfig = (PrefixElement, ElementConfig);
 
     #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -48,12 +80,6 @@ pub mod prefix_elements {
         ValueOnly,
         KeyValue(String),
     }
-
-    fn default_color() -> Color {
-        Color::White
-    }
-
-    const PATTERN: &str = "^#.*|rgb_\\(\\d{1,3},\\d{1,3},\\d{1,3}\\)|Black|DarkGrey|Red|DarkRed|Green|DarkGreen|Yellow|DarkYellow|Blue|DarkBlue|Magenta|DarkMagenta|Cyan|DarkCyan|White|Grey";
 
     #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
     pub struct ElementConfig {
