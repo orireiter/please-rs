@@ -56,7 +56,7 @@ impl LiveCommandPrefix {
         for (builder, element_config) in &self.element_builders {
             match builder.build_element() {
                 Ok(value) => {
-                    let stylized_element = stylize_element_value(&value, element_config);
+                    let stylized_element = stylize_element_value(value.trim(), element_config);
                     elements.push(stylized_element);
                 }
                 Err(e) => {
@@ -73,7 +73,10 @@ mod element_builder {
 
     use crate::commands::{
         config::prefix_elements::PrefixElement,
-        prefix::element_builder::{dir::DirPrefixElement, git::GitPrefixElement},
+        prefix::element_builder::{
+            constant_element::ConstantPrefixElement, custom::CustomPrefixElement,
+            dir::DirPrefixElement, git::GitPrefixElement,
+        },
     };
 
     pub fn get_element_builder(
@@ -82,7 +85,12 @@ mod element_builder {
         match element_type {
             PrefixElement::Dir(dir_type) => Some(Box::new(DirPrefixElement::new(dir_type.clone()))),
             PrefixElement::Git => Some(Box::new(GitPrefixElement::new())),
-            PrefixElement::Custom() => todo!(),
+            PrefixElement::Constant(value) => {
+                Some(Box::new(ConstantPrefixElement::new(value.clone())))
+            }
+            PrefixElement::Custom(command_conf) => {
+                Some(Box::new(CustomPrefixElement::new(command_conf.clone())))
+            }
         }
     }
 
@@ -146,13 +154,71 @@ mod element_builder {
 
                     if let Ok(head) = read_to_string(partial_part_with_head) {
                         match head.split("/").last() {
-                            Some(branch) => return Ok(branch.trim().to_string()),
+                            Some(branch) => return Ok(branch.to_string()),
                             None => return Err(anyhow::anyhow!("malformed git HEAD file")),
                         };
                     };
                 }
 
                 Err(anyhow::anyhow!("no git repo found when traversing path"))
+            }
+        }
+    }
+
+    pub mod constant_element {
+        use crate::commands::prefix::element_builder::PrefixElementBuilder;
+
+        pub struct ConstantPrefixElement {
+            value: String,
+        }
+
+        impl ConstantPrefixElement {
+            pub fn new(value: String) -> Self {
+                Self { value }
+            }
+        }
+
+        impl PrefixElementBuilder for ConstantPrefixElement {
+            fn build_element(&self) -> anyhow::Result<String> {
+                Ok(self.value.clone())
+            }
+        }
+    }
+
+    pub mod custom {
+        use std::process::Command;
+
+        use anyhow::Context;
+
+        use crate::commands::{
+            config::prefix_elements::CustomPrefixElementConfig,
+            prefix::element_builder::PrefixElementBuilder,
+        };
+
+        pub struct CustomPrefixElement {
+            command_config: CustomPrefixElementConfig,
+        }
+
+        impl CustomPrefixElement {
+            pub fn new(command_config: CustomPrefixElementConfig) -> Self {
+                Self { command_config }
+            }
+        }
+
+        impl PrefixElementBuilder for CustomPrefixElement {
+            fn build_element(&self) -> anyhow::Result<String> {
+                let result = Command::new(&self.command_config.command)
+                    .args(self.command_config.args.clone())
+                    .output()
+                    .context(format!(
+                        "failed to run command with config {:?}",
+                        self.command_config
+                    ))?;
+
+                String::from_utf8(result.stdout).context(format!(
+                    "failed to get output as string for command with config {:?}",
+                    self.command_config
+                ))
             }
         }
     }
@@ -261,6 +327,7 @@ mod tests {
             .to_string();
         let git_branch = GitPrefixElement::new()
             .build_element()
+            .map(|branch| branch.trim().to_string())
             .expect("test should run inside a git repo");
 
         let expected = format!(

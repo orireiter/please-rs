@@ -95,7 +95,8 @@ pub mod prefix_elements {
     pub enum PrefixElement {
         Dir(DirType),
         Git,
-        Custom(),
+        Constant(String),
+        Custom(CustomPrefixElementConfig),
     }
 
     #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -104,6 +105,12 @@ pub mod prefix_elements {
         Shortened,
         HomeRelative,
         CurrentOnly,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    pub struct CustomPrefixElementConfig {
+        pub command: String,
+        pub args: Vec<String>,
     }
 }
 
