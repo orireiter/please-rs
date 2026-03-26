@@ -1,4 +1,5 @@
 use std::env::{self};
+use std::fs::read_to_string;
 use std::io::Write;
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
@@ -309,6 +310,7 @@ enum NativeCommand {
     Clear,
     Ls(String),
     ChangeDir(String),
+    Cat(String),
 }
 
 impl CommandExecution for NativeCommand {
@@ -335,6 +337,23 @@ impl CommandExecution for NativeCommand {
                 std::env::set_current_dir(new_dir)?;
                 Ok(CommandOutcome::Continue)
             }
+            Self::Cat(path) => {
+                if path.is_empty() {
+                    Err(anyhow::anyhow!("no file specified"))
+                } else {
+                    match read_to_string(path) {
+                        Ok(content) => {
+                            println!("{content}");
+                            println!();
+                        }
+                        Err(e) => {
+                            log::error!("failed to read file in path: {path} , error {e}")
+                        }
+                    }
+
+                    Ok(CommandOutcome::Continue)
+                }
+            }
         }
     }
 }
@@ -344,12 +363,14 @@ impl NativeCommand {
     const LS: &str = "ls";
     const CD: &str = "cd";
     const CHDIR: &str = "chdir";
+    const CAT: &str = "cat";
 
     fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
         match executable.to_lowercase().as_str() {
             Self::CLEAR => Ok(Self::Clear),
             Self::LS => Ok(Self::Ls(args.collect())),
             Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
+            Self::CAT => Ok(Self::Cat(args.collect())),
             _ => Err(anyhow::anyhow!(
                 "unknown native command \"{executable}\" with args {:?}",
                 args
