@@ -411,21 +411,24 @@ impl PleaseTerminal {
                 }
             } else {
                 let full_len = self.live_command.get_full_len();
+                let mut steps = self
+                    .live_command
+                    .user_command
+                    .len()
+                    .saturating_sub(self.cursor_position);
                 if full_len == terminal_size_x {
                     print!(" ");
                     stdout.flush()?;
-                    for _ in 0..2 {
-                        utils::move_left(stdout)?;
-                    }
-                } else if full_len + 1 != terminal_size_x
-                    || self.cursor_position + 1 == self.live_command.user_command.len()
-                {
-                    // 12345678 -> 1234567 -> 123456
-                    // 12345678 -> 1234568 -> 123458
-                    // 1234567  -> 123456  -> 12345
-                    // 1234567  -> 123457  -> 12347
+                    steps = steps.saturating_add(1);
+                }
 
-                    utils::move_left(stdout)?
+                // 12345678 -> 1234567 -> 123456
+                // 12345678 -> 1234568 -> 123458
+                // 1234567  -> 123456  -> 12345
+                // 1234567  -> 123457  -> 12347
+
+                for _ in 0..steps {
+                    utils::move_left(stdout)?;
                 }
             }
 
