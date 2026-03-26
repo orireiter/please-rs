@@ -127,13 +127,19 @@ mod element_builder {
 
         impl PrefixElementBuilder for DirPrefixElement {
             fn build_element(&self) -> Result<String> {
-                if self.dir_type != DirType::Full {
-                    todo!("implement other prefix dir types")
-                }
+                let workdir =
+                    current_dir().context("failed getting current dir for prefix element")?;
 
-                current_dir()
-                    .map(|dir| dir.display().to_string())
-                    .context("failed getting current dir for prefix element")
+                match self.dir_type {
+                    DirType::Full => Ok(workdir.display().to_string()),
+                    DirType::CurrentOnly => workdir
+                        .file_name()
+                        .map(|file_name| file_name.display().to_string())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("failed getting last element in current dir path")
+                        }),
+                    _ => todo!("implement other prefix dir types"),
+                }
             }
         }
     }
