@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 
 use crate::commands::config::CommandConfig;
 use crate::commands::prefix::LiveCommandPrefix;
-use crate::utils::SPACE;
+use crate::utils::{SPACE, StyledContentGroup};
 
 const CMD: &str = "cmd";
 const RESERVED_CMD_COMMANDS: [&str; 82] = [
@@ -172,7 +172,7 @@ impl LiveCommand {
         self.user_command.iter().collect::<String>()
     }
 
-    pub fn live_command_prefix(&self) -> String {
+    pub fn live_command_prefix(&self) -> StyledContentGroup {
         self.command_prefix.get_command_prefix()
     }
 

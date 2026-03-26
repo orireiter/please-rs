@@ -2,11 +2,11 @@ use anyhow::{Context, Result};
 use please_rs::config::PleaseConfig;
 use std::{fs::File, io::BufWriter};
 
+const JSON_SCHEMA_PATH: &str = "please_config.schema.json";
 fn generate_config_schema() -> Result<()> {
-    let schema_path = "please_config.schema.json";
     let sch = schemars::schema_for!(PleaseConfig);
-    let schema_file = File::create(schema_path).context(format!(
-        "failed to create schema file for path: {schema_path}"
+    let schema_file = File::create(JSON_SCHEMA_PATH).context(format!(
+        "failed to create schema file for path: {JSON_SCHEMA_PATH}"
     ))?;
 
     let writer = BufWriter::new(schema_file);

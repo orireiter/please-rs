@@ -1,12 +1,17 @@
-use crate::commands::{
-    config::{
-        CommandPrefixConfig,
-        prefix_elements::{DirType, ElementConfig},
+use crossterm::style::{ContentStyle, StyledContent};
+
+use crate::{
+    commands::{
+        config::{
+            CommandPrefixConfig,
+            prefix_elements::{DirType, ElementConfig},
+        },
+        prefix::{
+            element_builder::{PrefixElementBuilder, dir::DirPrefixElement},
+            style::{stylize_delimiter, stylize_element_value},
+        },
     },
-    prefix::{
-        element_builder::{PrefixElementBuilder, dir::DirPrefixElement},
-        style::{stylize_delimiter, stylize_element_value},
-    },
+    utils::StyledContentGroup,
 };
 
 #[derive(Default)]
@@ -34,25 +39,29 @@ impl LiveCommandPrefix {
         }
     }
 
-    pub fn get_command_prefix(&self) -> String {
+    pub fn get_command_prefix(&self) -> StyledContentGroup {
         let prefix_elements = self.build_elements();
         let elements_delimiter =
             stylize_delimiter(&self.live_command_prefix_conf.prefix_elements_delimiter);
 
-        let prefix_elements_string = prefix_elements.join(&elements_delimiter);
+        let mut prefix_elements_delimited = prefix_elements.join(elements_delimiter);
 
         let command_delimiter =
             stylize_delimiter(&self.live_command_prefix_conf.prefix_to_command_delimiter);
-        prefix_elements_string + &command_delimiter
+        prefix_elements_delimited.push(command_delimiter);
+        prefix_elements_delimited
     }
 
-    fn build_elements(&self) -> Vec<String> {
+    fn build_elements(&self) -> StyledContentGroup {
         if self.live_command_prefix_conf.elements.is_empty() {
             let dir_part = DirPrefixElement::new(DirType::Full).build_element();
-            return vec![dir_part.unwrap_or_default()];
+
+            let stylized_dir =
+                StyledContent::new(ContentStyle::default(), dir_part.unwrap_or_default());
+            return StyledContentGroup::new(vec![stylized_dir]);
         }
 
-        let mut elements = Vec::new();
+        let mut elements = StyledContentGroup::default();
         for (builder, element_config) in &self.element_builders {
             match builder.build_element() {
                 Ok(value) => {
@@ -225,14 +234,17 @@ mod element_builder {
 }
 
 mod style {
-    use crossterm::style::Stylize;
+    use crossterm::style::{StyledContent, Stylize};
 
     use crate::commands::config::{
         DelimiterConfig,
         prefix_elements::{ElementConfig, PrefixElementDisplayParts},
     };
 
-    pub fn stylize_element_value(value: &str, display_config: &ElementConfig) -> String {
+    pub fn stylize_element_value(
+        value: &str,
+        display_config: &ElementConfig,
+    ) -> StyledContent<String> {
         let key = match &display_config.display_parts {
             PrefixElementDisplayParts::KeyValue(key) => key,
             _ => "",
@@ -243,17 +255,14 @@ mod style {
             .as_deref()
             .unwrap_or_default();
 
-        format!("{key}{key_value_delimiter}{value}")
-            .with(display_config.color)
-            .to_string()
+        format!("{key}{key_value_delimiter}{value}").with(display_config.color)
     }
 
-    pub fn stylize_delimiter(delimiter_config: &DelimiterConfig) -> String {
+    pub fn stylize_delimiter(delimiter_config: &DelimiterConfig) -> StyledContent<String> {
         delimiter_config
             .delimiter
             .clone()
             .with(delimiter_config.color)
-            .to_string()
     }
 }
 
@@ -283,7 +292,7 @@ mod tests {
             stylize_delimiter(&CommandPrefixConfig::default().prefix_to_command_delimiter);
 
         assert_eq!(
-            prefix,
+            format!("{prefix}"),
             format!("{}{expected_command_delimiter}", current_dir.display())
         );
     }
@@ -338,7 +347,7 @@ mod tests {
             stylize_delimiter(&config.prefix_to_command_delimiter),
         );
 
-        assert_eq!(prefix, expected);
+        assert_eq!(format!("{prefix}"), expected);
     }
 
     #[test]
@@ -376,6 +385,6 @@ mod tests {
             stylize_delimiter(&config.prefix_to_command_delimiter)
         );
 
-        assert_eq!(prefix, expected);
+        assert_eq!(format!("{prefix}"), expected);
     }
 }
