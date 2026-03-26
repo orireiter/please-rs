@@ -25,7 +25,10 @@ impl PleaseConfig {
         {
             match serde_json::from_str::<Self>(&workdir_conf) {
                 Ok(conf) => return conf,
-                Err(e) => log::warn!("Failed to get please config from workdir, error: {e}"),
+                Err(e) => {
+                    log::warn!("Failed to get please config from workdir, error: {e}");
+                    return Self::default();
+                }
             }
         }
 
@@ -37,7 +40,10 @@ impl PleaseConfig {
         {
             match serde_json::from_str::<Self>(&homedir_conf) {
                 Ok(conf) => return conf,
-                Err(e) => log::warn!("Failed to get please config from homedir, error: {e}"),
+                Err(e) => {
+                    log::warn!("Failed to get please config from homedir, error: {e}");
+                    return Self::default();
+                }
             }
         }
 

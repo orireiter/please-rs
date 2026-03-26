@@ -2,7 +2,7 @@ use crossterm::style::Color;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-const PATTERN: &str = "^#.*|rgb_\\(\\d{1,3},\\d{1,3},\\d{1,3}\\)|black|dark_grey|red|dark_red|green|dark_green|yellow|dark_yellow|blue|dark_blue|magenta|dark_magenta|cyan|dark_cyan|white|grey";
+const PATTERN: &str = "^(#.*|rgb_\\(\\d{1,3},\\d{1,3},\\d{1,3}\\)|black|dark_grey|red|dark_red|green|dark_green|yellow|dark_yellow|blue|dark_blue|magenta|dark_magenta|cyan|dark_cyan|white|grey)$";
 
 fn default_color() -> Color {
     Color::White

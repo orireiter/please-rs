@@ -217,7 +217,7 @@ mod element_builder {
         impl PrefixElementBuilder for CustomPrefixElement {
             fn build_element(&self) -> anyhow::Result<String> {
                 let result = Command::new(&self.command_config.command)
-                    .args(self.command_config.args.clone())
+                    .args(&self.command_config.args)
                     .output()
                     .context(format!(
                         "failed to run command with config {:?}",
