@@ -1,7 +1,8 @@
-use std::io::Write;
+use std::{fmt::Display, io::Write};
 
 use anyhow::{Context, Result};
-use crossterm::{ExecutableCommand, QueueableCommand, cursor, terminal};
+use crossterm::{ExecutableCommand, QueueableCommand, cursor, style::StyledContent, terminal};
+use itertools::intersperse;
 
 pub const SPACE: &str = " ";
 pub const NEWLINE: &str = "\n";
@@ -65,4 +66,46 @@ pub fn move_left(stdout: &mut std::io::Stdout) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Default)]
+pub struct StyledContentGroup {
+    styled_content: Vec<StyledContent<String>>,
+}
+
+impl StyledContentGroup {
+    pub fn new(styled_content: Vec<StyledContent<String>>) -> Self {
+        Self { styled_content }
+    }
+
+    pub fn len(&self) -> usize {
+        self.styled_content.iter().fold(0, |acc, styled_element| {
+            acc + styled_element.content().len()
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.styled_content.is_empty()
+    }
+
+    pub fn join(&self, delimiter: StyledContent<String>) -> Self {
+        let delimited = intersperse(self.styled_content.iter().cloned(), delimiter);
+
+        StyledContentGroup::new(delimited.collect())
+    }
+
+    pub fn push(&mut self, element: StyledContent<String>) {
+        self.styled_content.push(element);
+    }
+}
+
+impl Display for StyledContentGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content_as_string = self
+            .styled_content
+            .iter()
+            .fold(String::new(), |acc, element| acc + &element.to_string());
+        write!(f, "{content_as_string}")
+    }
 }

@@ -40,3 +40,10 @@ repos:
       language: system
       types: [rust]
       pass_filenames: false
+    - id: config-json-schema
+      name: config-json-schema
+      description: Generate the config JSON schema to validate it's not broken
+      entry: cargo run
+      args: ["--bin", "generate_config_schema"]
+      language: system
+      types: [rust]

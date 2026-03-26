@@ -448,7 +448,7 @@ mod tests {
         // Expected printed grid (if this test passes):
         // [no rows printed]
 
-        assert_eq!(config.starting_indices, vec![]);
+        assert_eq!(config.starting_indices, Vec::<usize>::new());
     }
 
     #[test]

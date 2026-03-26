@@ -1,11 +1,13 @@
-use std::env::{self, current_dir};
+use std::env::{self};
 use std::io::Write;
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
 
 use anyhow::{Context, Result};
 
-use crate::utils::SPACE;
+use crate::commands::config::CommandConfig;
+use crate::commands::prefix::LiveCommandPrefix;
+use crate::utils::{SPACE, StyledContentGroup};
 
 const CMD: &str = "cmd";
 const RESERVED_CMD_COMMANDS: [&str; 82] = [
@@ -99,16 +101,19 @@ const PATH_ENV_VAR: &str = "PATH";
 const PATH_ENV_VAR_DELIMITER: &str = ";";
 const QUOTES: [&str; 2] = ["\"", "'"];
 
-const LIVE_COMMAND_PREFIX_DELIMITER: &str = " -> ";
-
 pub struct LiveCommand {
     pub user_command: Vec<char>,
+    command_prefix: LiveCommandPrefix,
+    #[allow(dead_code)]
+    config: CommandConfig,
 }
 
 impl LiveCommand {
-    pub fn new() -> Self {
+    pub fn from_config(config: CommandConfig) -> Self {
         Self {
             user_command: Vec::new(),
+            command_prefix: LiveCommandPrefix::new(config.prefix_config.clone()),
+            config,
         }
     }
 
@@ -167,15 +172,8 @@ impl LiveCommand {
         self.user_command.iter().collect::<String>()
     }
 
-    pub fn live_command_prefix(&self) -> String {
-        let dir_part = match current_dir() {
-            Ok(dir) => dir.display().to_string(),
-            Err(e) => format!("<error: {e}>"),
-        };
-
-        let delimiter = LIVE_COMMAND_PREFIX_DELIMITER;
-
-        format!("{dir_part}{delimiter}")
+    pub fn live_command_prefix(&self) -> StyledContentGroup {
+        self.command_prefix.get_command_prefix()
     }
 
     fn get_base_process_command(&self, executable: &str) -> Result<std::process::Command> {
@@ -258,6 +256,8 @@ impl LiveCommand {
     pub fn get_full_len(&self) -> usize {
         self.live_command_prefix().len() + self.user_command.len()
     }
+
+    // todo handle env vars before executable
 }
 
 trait CommandExecution {
