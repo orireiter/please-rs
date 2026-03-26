@@ -5,17 +5,17 @@
 3.1. and support omz plugin format.
 4. Support customizations for:  
 4.1. path prefix presentations.  
-4.2. colors and such.
+4.2. colors and such. ✔️
 5. Implement some useful commands:
 5.2 ls ✔️
 5.3. cat
 5.4. ...  
-6. Support quick jumps with <arrow|delete> + ctrl
+6. Support quick jumps with <arrow|delete> + ctrl ✔️
 7. Validate why commands with `"` in them aren't interpreted correctly ✔️
 8. Support quick clear of command with `ctrl+c`✔️
 9. Handle copy+pasting ✔️ (was working out of the box I think)
-10. Add git visual support if not part of omz plugin support.
+10. Add git visual support if not part of omz plugin support. 
 11. Add installation support to make usage easier
 12. Allow marking text with shift+arrow
-13. BUG - Handle bug where attempting to add new line if cursor is not at the end of the command, check backspace as well.
+13. BUG - Handle bug where attempting to add new line if cursor is not at the end of the command, check backspace as well. ✔️
 14. handle env vars before executable in command
