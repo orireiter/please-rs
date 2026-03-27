@@ -370,7 +370,14 @@ impl NativeCommand {
             Self::CLEAR => Ok(Self::Clear),
             Self::LS => Ok(Self::Ls(args.collect())),
             Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
-            Self::CAT => Ok(Self::Cat(args.collect())),
+            Self::CAT => {
+                let mut cloned_args = args.clone();
+                let path = cloned_args.next().unwrap_or_default();
+                if cloned_args.next().is_some() {
+                    return Err(anyhow::anyhow!("cat accepts only a single path argument"));
+                }
+                Ok(Self::Cat(path.to_string()))
+            }
             _ => Err(anyhow::anyhow!(
                 "unknown native command \"{executable}\" with args {:?}",
                 args
