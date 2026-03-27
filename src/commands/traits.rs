@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConcatType {
     /// "foo" + "bar" -> "foo{DELIMITER}bar"
     Delimited(String),
