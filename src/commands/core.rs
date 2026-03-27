@@ -1,6 +1,6 @@
 use std::env::{self};
-use std::fs::read_to_string;
-use std::io::Write;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
 
@@ -341,15 +341,12 @@ impl CommandExecution for NativeCommand {
                 if path.is_empty() {
                     Err(anyhow::anyhow!("no file specified"))
                 } else {
-                    match read_to_string(path) {
-                        Ok(content) => {
-                            println!("{content}");
-                            println!();
-                        }
-                        Err(e) => {
-                            log::error!("failed to read file in path: {path} , error {e}")
-                        }
+                    let file = File::open(path)?;
+                    let buf_read = BufReader::new(file);
+                    for line in buf_read.lines() {
+                        println!("{}", line?);
                     }
+                    println!();
 
                     Ok(CommandOutcome::Continue)
                 }
