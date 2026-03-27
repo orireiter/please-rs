@@ -304,6 +304,37 @@ mod tests {
     }
 
     #[test]
+    fn default_prefix_uses_only_current_dir_and_default_command_delimiter() {
+        let mut conf = CommandPrefixConfig::default();
+        conf.elements.push((
+            PrefixElement::Dir(DirType::CurrentOnly),
+            ElementConfig {
+                display_parts: PrefixElementDisplayParts::ValueOnly,
+                key_value_delimiter: None,
+                color: Color::White,
+            },
+        ));
+        let prefix = LiveCommandPrefix::new(Some(conf.clone())).get_command_prefix();
+        let whole_cuurent_dir = current_dir().expect("current dir should be available");
+
+        let current_dir = stylize_element_value(
+            &whole_cuurent_dir
+                .iter()
+                .next_back()
+                .expect("should have at least on folder")
+                .display()
+                .to_string(),
+            &conf.elements[0].1,
+        );
+        let expected_command_delimiter = stylize_delimiter(&conf.prefix_to_command_delimiter);
+
+        assert_eq!(
+            format!("{prefix}"),
+            format!("{}{expected_command_delimiter}", current_dir)
+        );
+    }
+
+    #[test]
     fn prefix_respects_config_from_please_config_style() {
         let dir_element_config = ElementConfig {
             display_parts: PrefixElementDisplayParts::ValueOnly,
