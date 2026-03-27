@@ -8,7 +8,7 @@
 4.2. colors and such. ✔️
 5. Implement some useful commands:
 5.2 ls ✔️
-5.3. cat
+5.3. cat ✔️
 5.4. ...  
 6. Support quick jumps with <arrow|delete> + ctrl ✔️
 7. Validate why commands with `"` in them aren't interpreted correctly ✔️

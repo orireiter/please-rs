@@ -1,5 +1,6 @@
 use std::env::{self};
-use std::io::Write;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
 
@@ -309,6 +310,7 @@ enum NativeCommand {
     Clear,
     Ls(String),
     ChangeDir(String),
+    Cat(String),
 }
 
 impl CommandExecution for NativeCommand {
@@ -335,6 +337,20 @@ impl CommandExecution for NativeCommand {
                 std::env::set_current_dir(new_dir)?;
                 Ok(CommandOutcome::Continue)
             }
+            Self::Cat(path) => {
+                if path.is_empty() {
+                    Err(anyhow::anyhow!("no file specified"))
+                } else {
+                    let file = File::open(path)?;
+                    let buf_read = BufReader::new(file);
+                    for line in buf_read.lines() {
+                        println!("{}", line?);
+                    }
+                    println!();
+
+                    Ok(CommandOutcome::Continue)
+                }
+            }
         }
     }
 }
@@ -344,12 +360,21 @@ impl NativeCommand {
     const LS: &str = "ls";
     const CD: &str = "cd";
     const CHDIR: &str = "chdir";
+    const CAT: &str = "cat";
 
     fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
         match executable.to_lowercase().as_str() {
             Self::CLEAR => Ok(Self::Clear),
             Self::LS => Ok(Self::Ls(args.collect())),
             Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
+            Self::CAT => {
+                let mut cloned_args = args.clone();
+                let path = cloned_args.next().unwrap_or_default();
+                if cloned_args.next().is_some() {
+                    return Err(anyhow::anyhow!("cat accepts only a single path argument"));
+                }
+                Ok(Self::Cat(path.to_string()))
+            }
             _ => Err(anyhow::anyhow!(
                 "unknown native command \"{executable}\" with args {:?}",
                 args
