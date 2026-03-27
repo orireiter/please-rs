@@ -457,6 +457,7 @@ impl PleaseTerminal {
     }
 
     fn move_cursor_right(&mut self, stdout: &mut std::io::Stdout, steps: usize) -> Result<()> {
+        stdout.execute(crossterm_cursor::Hide)?;
         for _ in 0..steps {
             if self.cursor_position == self.live_command.user_command.len() {
                 break;
@@ -473,10 +474,13 @@ impl PleaseTerminal {
             self.cursor_position += 1;
         }
 
+        stdout.execute(crossterm_cursor::Show)?;
+
         Ok(())
     }
 
     fn move_cursor_left(&mut self, stdout: &mut std::io::Stdout, steps: usize) -> Result<()> {
+        stdout.execute(crossterm_cursor::Hide)?;
         for _ in 0..steps {
             if self.cursor_position == 0 {
                 break;
@@ -486,6 +490,7 @@ impl PleaseTerminal {
             self.cursor_position = self.cursor_position.saturating_sub(1);
         }
 
+        stdout.execute(crossterm_cursor::Show)?;
         Ok(())
     }
 
