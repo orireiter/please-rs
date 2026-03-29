@@ -61,10 +61,10 @@ impl GitCompletionProvider {
 impl CompletionProvider for GitCompletionProvider {
     fn is_valid_provider(&self, current_command: &str) -> bool {
         current_command
-            .trim()
-            .to_lowercase()
-            .as_str()
-            .starts_with(Self::GIT)
+            .split_whitespace()
+            .next()
+            .map(|cmd| cmd.eq_ignore_ascii_case(Self::GIT))
+            .unwrap_or(false)
     }
 
     fn try_completing(&self, current_command: &str) -> Result<Vec<CompletionCandidate>> {
@@ -72,7 +72,7 @@ impl CompletionProvider for GitCompletionProvider {
         let last_element = splitted_command.next_back().unwrap_or_default();
 
         if splitted_command.next_back().is_none() {
-            let concat_type = if current_command == Self::GIT {
+            let concat_type = if current_command.trim().eq_ignore_ascii_case(Self::GIT) {
                 ConcatType::Delimited(SPACE.to_string())
             } else {
                 ConcatType::PrefixConcat(0)

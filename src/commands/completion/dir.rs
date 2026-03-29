@@ -48,7 +48,7 @@ impl CompletionProvider for DirectoryCompletionProvider {
                 }
             } else {
                 return Err(anyhow::anyhow!(
-                    "failed to deconstruct elemnts of dir tab completion for last parameter"
+                    "failed to deconstruct elements of dir tab completion for last parameter"
                 ));
             }
         } else if let Ok(current_dir) = self.get_current_dir_read_dir() {
