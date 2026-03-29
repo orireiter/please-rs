@@ -52,10 +52,8 @@ impl CompletionProvider for DirectoryCompletionProvider {
                     "failed to deconstruct elements of dir tab completion for last parameter"
                 ));
             }
-        } else if let Ok(current_dir) = self.get_current_dir_read_dir() {
-            current_dir
         } else {
-            return Err(anyhow::anyhow!("failed to get directory completions"));
+            self.get_current_dir_read_dir()?
         };
 
         let mut candidates = Vec::new();

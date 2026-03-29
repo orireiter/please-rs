@@ -102,4 +102,63 @@ impl CompletionProvider for GitCompletionProvider {
     }
 }
 
-// todo add tests!
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use crate::commands::{
+        completion::git::{GIT_COMMANDS, GitCompletionProvider},
+        traits::CompletionProvider,
+    };
+
+    #[test]
+    fn when_no_arg_retrieve_all_commands() {
+        let all_commands: HashSet<String> = GIT_COMMANDS.iter().map(|c| c.to_string()).collect();
+        for command in ["git", "git "] {
+            let candidates = GitCompletionProvider {}
+                .try_completing(command)
+                .expect("expected to get git candidates");
+            let candidate_values: Vec<String> =
+                candidates.iter().map(|c| c.value.clone()).collect();
+
+            // check they have same unique values
+            assert_eq!(
+                all_commands,
+                HashSet::from_iter(candidate_values.iter().map(|c| c.to_string()))
+            );
+            // check they are the same length without dedup
+            assert_eq!(all_commands.len(), candidate_values.len());
+        }
+    }
+
+    #[test]
+    fn filter_git_commands_by_arg_prefix() {
+        for arg in ["ch", "checkout", "abc"] {
+            let all_ch_commands: HashSet<String> = GIT_COMMANDS
+                .iter()
+                .filter_map(|c| {
+                    if c.starts_with(arg) {
+                        Some(c.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let command = format!("git {arg}");
+            let candidates = GitCompletionProvider {}
+                .try_completing(&command)
+                .expect("expected to get git candidates");
+            let candidate_values: Vec<String> =
+                candidates.iter().map(|c| c.value.clone()).collect();
+
+            // check they have same unique values
+            assert_eq!(
+                all_ch_commands,
+                HashSet::from_iter(candidate_values.iter().map(|c| c.to_string()))
+            );
+            // check they are the same length without dedup
+            assert_eq!(all_ch_commands.len(), candidate_values.len());
+        }
+    }
+}
