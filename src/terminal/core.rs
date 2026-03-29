@@ -9,6 +9,7 @@ use crate::{
     commands::{
         CommandOutcome, LiveCommand, completion::get_completion_provider, traits::ConcatType,
     },
+    config::PleaseConfig,
     history,
     terminal::{
         tab_context::{self, TabResult},
@@ -26,6 +27,7 @@ enum TerminalLoopEvent {
 pub struct PleaseTerminal {
     live_command: LiveCommand,
     history: history::History,
+    config: PleaseConfig,
 
     cursor_position: usize,
     history_pattern_position: usize,
@@ -207,7 +209,8 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
     fn handle_tab(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         let command_string = self.live_command.user_command_as_string();
 
-        let completion_provider = get_completion_provider(&command_string);
+        let completion_provider =
+            get_completion_provider(&command_string, &self.config.command.completion_config);
         let possible_completions = completion_provider.try_completing(&command_string)?;
 
         if possible_completions.is_empty() {
@@ -278,10 +281,15 @@ impl terminal_traits::IsKeyEvents for PleaseTerminal {
 }
 
 impl PleaseTerminal {
-    pub fn new(history: history::History, command_manager: LiveCommand) -> Self {
+    pub fn new(
+        history: history::History,
+        command_manager: LiveCommand,
+        config: PleaseConfig,
+    ) -> Self {
         Self {
             live_command: command_manager,
             history,
+            config,
             cursor_position: 0,
             history_pattern_position: 0,
         }
