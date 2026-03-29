@@ -14,10 +14,11 @@ fn main() -> Result<()> {
     utils::init_terminal()?;
 
     let config = PleaseConfig::get_from_filesystem();
-    let history_object = history::History::from_config(config.history)?;
-    let command_object = commands::LiveCommand::from_config(config.command);
+    let history_object = history::History::from_config(config.history.clone())?;
+    let command_object = commands::LiveCommand::from_config(config.command.clone());
 
-    let mut terminal = terminal::PleaseTerminal::new(history_object, command_object);
+    let mut terminal =
+        terminal::PleaseTerminal::new(history_object, command_object, config.clone());
     terminal.run()?;
 
     Ok(())

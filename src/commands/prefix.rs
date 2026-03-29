@@ -24,8 +24,7 @@ pub struct LiveCommandPrefix {
 }
 
 impl LiveCommandPrefix {
-    pub fn new(config: Option<CommandPrefixConfig>) -> Self {
-        let config = config.unwrap_or_default();
+    pub fn from_config(config: CommandPrefixConfig) -> Self {
         Self {
             live_command_prefix_conf: config.clone(),
             element_builders: config
@@ -292,7 +291,8 @@ mod tests {
 
     #[test]
     fn default_prefix_uses_full_current_dir_and_default_command_delimiter() {
-        let prefix = LiveCommandPrefix::new(None).get_command_prefix();
+        let prefix =
+            LiveCommandPrefix::from_config(CommandPrefixConfig::default()).get_command_prefix();
         let current_dir = current_dir().expect("current dir should be available");
         let expected_command_delimiter =
             stylize_delimiter(&CommandPrefixConfig::default().prefix_to_command_delimiter);
@@ -314,7 +314,7 @@ mod tests {
                 color: Color::White,
             },
         ));
-        let prefix = LiveCommandPrefix::new(Some(conf.clone())).get_command_prefix();
+        let prefix = LiveCommandPrefix::from_config(conf.clone()).get_command_prefix();
         let whole_cuurent_dir = current_dir().expect("current dir should be available");
 
         let current_dir = stylize_element_value(
@@ -365,7 +365,7 @@ mod tests {
             ],
         };
 
-        let prefix = LiveCommandPrefix::new(Some(config.clone())).get_command_prefix();
+        let prefix = LiveCommandPrefix::from_config(config.clone()).get_command_prefix();
 
         let dir = current_dir()
             .expect("current dir should be available")
@@ -410,7 +410,7 @@ mod tests {
             )],
         };
 
-        let prefix = LiveCommandPrefix::new(Some(config.clone())).get_command_prefix();
+        let prefix = LiveCommandPrefix::from_config(config.clone()).get_command_prefix();
         let dir = current_dir()
             .expect("current dir should be available")
             .display()

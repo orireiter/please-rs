@@ -1,6 +1,8 @@
+use std::fmt::Debug;
+
 use anyhow::Result;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConcatType {
     /// "foo" + "bar" -> "foo{DELIMITER}bar"
     Delimited(String),
@@ -22,7 +24,7 @@ impl CompletionCandidate {
     }
 }
 
-pub trait CompletionProvider {
+pub trait CompletionProvider: Debug {
     fn is_valid_provider(&self, current_command: &str) -> bool;
 
     fn try_completing(&self, current_command: &str) -> Result<Vec<CompletionCandidate>>;

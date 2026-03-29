@@ -8,17 +8,10 @@ fn default_color() -> Color {
     Color::White
 }
 
-#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Default, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommandConfig {
-    pub prefix_config: Option<CommandPrefixConfig>,
-}
-
-impl Default for CommandConfig {
-    fn default() -> Self {
-        Self {
-            prefix_config: Some(CommandPrefixConfig::default()),
-        }
-    }
+    pub prefix_config: CommandPrefixConfig,
+    pub completion_config: CommandCompletionConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -114,13 +107,36 @@ pub mod prefix_elements {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CommandCompletionConfig {
+    pub providers: Vec<CommandCompletionProviderEnum>,
+}
+
+impl Default for CommandCompletionConfig {
+    fn default() -> Self {
+        Self {
+            providers: vec![
+                CommandCompletionProviderEnum::Git,
+                CommandCompletionProviderEnum::Dir,
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub enum CommandCompletionProviderEnum {
+    Dir,
+    Git,
+    Custom,
+}
+
 #[cfg(test)]
 mod tests {
     use crossterm::style::Color;
     use serde_json::json;
 
     use crate::commands::config::{
-        CommandPrefixConfig, DelimiterConfig,
+        CommandCompletionConfig, CommandPrefixConfig, DelimiterConfig,
         prefix_elements::{DirType, ElementConfig, PrefixElement, PrefixElementDisplayParts},
     };
 
@@ -187,7 +203,7 @@ mod tests {
     #[test]
     fn serialize_command_config_emits_expected_json_shape() {
         let command_cfg = CommandConfig {
-            prefix_config: Some(CommandPrefixConfig {
+            prefix_config: CommandPrefixConfig {
                 prefix_to_command_delimiter: DelimiterConfig {
                     delimiter: " => ".to_string(),
                     color: Color::Blue,
@@ -204,7 +220,8 @@ mod tests {
                         color: Color::Yellow,
                     },
                 )],
-            }),
+            },
+            completion_config: CommandCompletionConfig::default(),
         };
 
         let serialized = serde_json::to_value(command_cfg).expect("config should serialize");
@@ -228,6 +245,9 @@ mod tests {
                         }
                     ]
                 ]
+            },
+            "completion_config": {
+               "providers": ["Git", "Dir"]
             }
         });
 

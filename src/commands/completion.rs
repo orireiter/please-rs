@@ -1,117 +1,109 @@
-use std::{
-    fs::ReadDir,
-    path::{self, MAIN_SEPARATOR_STR},
+mod dir;
+mod git;
+
+use crate::commands::{
+    completion::{dir::DirectoryCompletionProvider, git::GitCompletionProvider},
+    config::{CommandCompletionConfig, CommandCompletionProviderEnum},
+    traits::CompletionProvider,
 };
 
-use anyhow::Context;
-
-use crate::{
-    commands::traits::{CompletionCandidate, CompletionProvider, ConcatType},
-    utils::SPACE,
-};
-
-pub fn get_completion_provider(current_command: &str) -> Box<dyn CompletionProvider> {
-    // todo make the ordering configurable
-    let providers: [Box<dyn CompletionProvider>; 1] = [
-        // Box::new(GitCompletionProvider),
-        Box::new(DirectoryCompletionProvider),
-    ];
-
-    for provider in providers {
-        if provider.is_valid_provider(current_command) {
-            return provider;
-        }
-    }
-
-    Box::new(DirectoryCompletionProvider)
-}
-
-struct DirectoryCompletionProvider;
-
-impl DirectoryCompletionProvider {
-    fn get_current_dir_read_dir(&self) -> anyhow::Result<ReadDir> {
-        let current_dir = std::env::current_dir()?;
-        std::fs::read_dir(current_dir).context("failed to get read_dir for current used env")
-    }
-}
-
-impl CompletionProvider for DirectoryCompletionProvider {
-    fn is_valid_provider(&self, _: &str) -> bool {
-        true
-    }
-
-    fn try_completing(&self, current_command: &str) -> anyhow::Result<Vec<CompletionCandidate>> {
-        let mut prefix_filter = "";
-
-        let read_dir = if let Some(last_arg) = current_command.split_whitespace().last()
-            && !last_arg.is_empty()
-            && !current_command.ends_with(SPACE)
-        {
-            let last_arg_path = path::Path::new(last_arg);
-
-            if let Ok(dir_arg) = last_arg_path.read_dir() {
-                dir_arg
-            } else if let Some(parent_path) = last_arg_path.parent()
-                && let Some(file_name) = last_arg_path.file_name()
-                && let Some(file_name) = file_name.to_str()
-            {
-                prefix_filter = file_name;
-
-                if last_arg_path.is_relative() {
-                    path::Path::new(".").join(parent_path).read_dir()?
-                } else {
-                    parent_path.read_dir()?
-                }
+pub fn get_completion_provider(
+    current_command: &str,
+    completion_config: &CommandCompletionConfig,
+) -> Box<dyn CompletionProvider> {
+    completion_config
+        .providers
+        .iter()
+        .find_map(|provider_enum| {
+            let provider = get_provider_from_enum(provider_enum);
+            if provider.is_valid_provider(current_command) {
+                Some(provider)
             } else {
-                return Err(anyhow::anyhow!(
-                    "failed to deconstruct elemnts of dir tab completion for last parameter"
-                ));
+                None
             }
-        } else if let Ok(current_dir) = self.get_current_dir_read_dir() {
-            current_dir
-        } else {
-            return Err(anyhow::anyhow!("failed to get directory completions"));
-        };
+        })
+        .unwrap_or_else(|| Box::new(DirectoryCompletionProvider))
+}
 
-        let mut candidates = Vec::new();
-        for result_entry in read_dir {
-            match result_entry {
-                Ok(dir_entry) => {
-                    let file_name = dir_entry.file_name().to_string_lossy().to_string();
-                    if file_name.starts_with(prefix_filter) {
-                        let concat_type = if prefix_filter.is_empty() {
-                            ConcatType::Delimited(MAIN_SEPARATOR_STR.to_string())
-                        } else {
-                            ConcatType::PrefixConcat(prefix_filter.len())
-                        };
+fn get_provider_from_enum(
+    provider_enum: &CommandCompletionProviderEnum,
+) -> Box<dyn CompletionProvider> {
+    match provider_enum {
+        CommandCompletionProviderEnum::Dir => Box::new(DirectoryCompletionProvider),
+        CommandCompletionProviderEnum::Git => Box::new(GitCompletionProvider),
+        CommandCompletionProviderEnum::Custom => todo!(),
+    }
+}
 
-                        let as_candidate = CompletionCandidate::new(file_name, concat_type);
-                        candidates.push(as_candidate);
-                    }
-                }
-                Err(e) => return Err(e).context("failed to get file names in current folder"),
-            }
+#[cfg(test)]
+mod tests {
+    use crate::commands::{
+        completion::{
+            dir::DirectoryCompletionProvider, get_completion_provider, git::GitCompletionProvider,
+        },
+        config::{CommandCompletionConfig, CommandCompletionProviderEnum},
+    };
+
+    #[test]
+    fn default_completion_provider_is_dir_completion() {
+        let provider = get_completion_provider("", &CommandCompletionConfig { providers: vec![] });
+
+        let provider_string = format!("{provider:?}");
+
+        assert_eq!(provider_string, format!("{DirectoryCompletionProvider:?}"));
+    }
+
+    #[test]
+    fn git_is_selected_when_git_is_checked_before_dir_for_git_input() {
+        let git_string = format!("{GitCompletionProvider:?}");
+        for test_cmd in ["git", "git ", "git st"] {
+            let provider = get_completion_provider(
+                test_cmd,
+                &CommandCompletionConfig {
+                    providers: vec![
+                        CommandCompletionProviderEnum::Git,
+                        CommandCompletionProviderEnum::Dir,
+                    ],
+                },
+            );
+
+            let provider_string = format!("{provider:?}");
+
+            assert_eq!(provider_string, git_string);
         }
-
-        Ok(candidates)
-    }
-}
-
-#[allow(dead_code)]
-struct GitCompletionProvider;
-
-#[allow(dead_code)]
-impl GitCompletionProvider {
-    pub const GIT: &str = "git";
-}
-
-impl CompletionProvider for GitCompletionProvider {
-    fn is_valid_provider(&self, current_command: &str) -> bool {
-        current_command.trim().to_lowercase().as_str() == Self::GIT
-        // todo optimize
     }
 
-    fn try_completing(&self, _current_command: &str) -> anyhow::Result<Vec<CompletionCandidate>> {
-        todo!("implement git completion")
+    #[test]
+    fn dir_is_selected_when_dir_is_checked_before_git_for_git_input() {
+        let provider = get_completion_provider(
+            "git st",
+            &CommandCompletionConfig {
+                providers: vec![
+                    CommandCompletionProviderEnum::Dir,
+                    CommandCompletionProviderEnum::Git,
+                ],
+            },
+        );
+
+        let provider_string = format!("{provider:?}");
+
+        assert_eq!(provider_string, format!("{DirectoryCompletionProvider:?}"));
+    }
+
+    #[test]
+    fn dir_is_selected_for_non_git_input_even_when_git_is_checked_first() {
+        let provider = get_completion_provider(
+            "cargo t",
+            &CommandCompletionConfig {
+                providers: vec![
+                    CommandCompletionProviderEnum::Git,
+                    CommandCompletionProviderEnum::Dir,
+                ],
+            },
+        );
+
+        let provider_string = format!("{provider:?}");
+
+        assert_eq!(provider_string, format!("{DirectoryCompletionProvider:?}"));
     }
 }

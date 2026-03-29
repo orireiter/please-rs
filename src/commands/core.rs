@@ -113,7 +113,7 @@ impl LiveCommand {
     pub fn from_config(config: CommandConfig) -> Self {
         Self {
             user_command: Vec::new(),
-            command_prefix: LiveCommandPrefix::new(config.prefix_config.clone()),
+            command_prefix: LiveCommandPrefix::from_config(config.prefix_config.clone()),
             config,
         }
     }

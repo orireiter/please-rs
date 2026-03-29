@@ -1,0 +1,83 @@
+use std::{
+    fs::ReadDir,
+    path::{self, MAIN_SEPARATOR_STR},
+};
+
+use anyhow::Context;
+
+use crate::{
+    commands::traits::{CompletionCandidate, CompletionProvider, ConcatType},
+    utils::SPACE,
+};
+
+#[derive(Debug)]
+pub struct DirectoryCompletionProvider;
+
+impl DirectoryCompletionProvider {
+    fn get_current_dir_read_dir(&self) -> anyhow::Result<ReadDir> {
+        let current_dir = std::env::current_dir()?;
+        std::fs::read_dir(current_dir).context("failed to get read_dir for current used env")
+    }
+}
+
+impl CompletionProvider for DirectoryCompletionProvider {
+    fn is_valid_provider(&self, _: &str) -> bool {
+        true
+    }
+
+    fn try_completing(&self, current_command: &str) -> anyhow::Result<Vec<CompletionCandidate>> {
+        let mut prefix_filter = "";
+
+        let read_dir = if let Some(last_arg) = current_command.split_whitespace().last()
+            && !last_arg.is_empty()
+            && !current_command.ends_with(SPACE)
+        {
+            let last_arg_path = path::Path::new(last_arg);
+
+            if let Ok(dir_arg) = last_arg_path.read_dir() {
+                dir_arg
+            } else if let Some(parent_path) = last_arg_path.parent()
+                && let Some(file_name) = last_arg_path.file_name()
+                && let Some(file_name) = file_name.to_str()
+            {
+                prefix_filter = file_name;
+
+                if last_arg_path.is_relative() {
+                    path::Path::new(".").join(parent_path).read_dir()?
+                } else {
+                    parent_path.read_dir()?
+                }
+            } else {
+                return Err(anyhow::anyhow!(
+                    "failed to deconstruct elements of dir tab completion for last parameter"
+                ));
+            }
+        } else {
+            self.get_current_dir_read_dir()?
+        };
+
+        let mut candidates = Vec::new();
+        for result_entry in read_dir {
+            match result_entry {
+                Ok(dir_entry) => {
+                    let file_name = dir_entry.file_name().to_string_lossy().to_string();
+                    if file_name.starts_with(prefix_filter) {
+                        let concat_type = if prefix_filter.is_empty() {
+                            ConcatType::Delimited(MAIN_SEPARATOR_STR.to_string())
+                        } else {
+                            ConcatType::PrefixConcat(prefix_filter.len())
+                        };
+
+                        let as_candidate = CompletionCandidate::new(file_name, concat_type);
+                        candidates.push(as_candidate);
+                    }
+                }
+                Err(e) => return Err(e).context("failed to get file names in current folder"),
+            }
+        }
+
+        Ok(candidates)
+    }
+}
+
+// todo add tests!
