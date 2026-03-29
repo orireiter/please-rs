@@ -52,6 +52,7 @@ const GIT_COMMANDS: [&str; 44] = [
     "worktree",
 ];
 
+#[derive(Debug)]
 pub struct GitCompletionProvider;
 
 impl GitCompletionProvider {

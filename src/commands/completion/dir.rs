@@ -10,6 +10,7 @@ use crate::{
     utils::SPACE,
 };
 
+#[derive(Debug)]
 pub struct DirectoryCompletionProvider;
 
 impl DirectoryCompletionProvider {

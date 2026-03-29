@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use anyhow::Result;
 
 #[derive(Debug, Clone)]
@@ -22,7 +24,7 @@ impl CompletionCandidate {
     }
 }
 
-pub trait CompletionProvider {
+pub trait CompletionProvider: Debug {
     fn is_valid_provider(&self, current_command: &str) -> bool;
 
     fn try_completing(&self, current_command: &str) -> Result<Vec<CompletionCandidate>>;
