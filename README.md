@@ -17,6 +17,7 @@ Currently, in addition to achieving feature-parity with CMD (feedback is welcome
     * Currently built-in providers are:
         * Directory Completion.
         * Git main commands completion.
+        * Please commands.
         * 🚧 custom providers as configurations, are <u>not</u> supported yet.
 3. Quick jumping and deletion with left/right/backspace + CTRL_C
 4. Copying and pasting (already supported without requiring any implementation).
@@ -87,6 +88,7 @@ The Schema can be built by running `cargo run --bin generate_config_schema`.
     },
     "completion_config": {
       "providers": [
+        "Please",
         "Git",
         "Dir"
       ]
