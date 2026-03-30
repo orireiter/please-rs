@@ -1,6 +1,5 @@
 use std::env::{self};
-use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::str::{FromStr, SplitWhitespace};
 use std::{path, process};
 
@@ -143,9 +142,10 @@ impl LiveCommand {
         if please::PleaseCommand::is_please_command(executable) {
             let please_command = please::PleaseCommand::try_from(splitted_command)?;
             return please_command.execute_command();
-        } else if let Ok(native_command) =
-            NativeCommand::try_from_executable_and_args(executable, splitted_command.clone())
-        {
+        } else if let Ok(native_command) = native::NativeCommand::try_from_executable_and_args(
+            executable,
+            splitted_command.clone(),
+        ) {
             return native_command.execute_command();
         }
 
@@ -324,79 +324,98 @@ pub mod please {
     }
 }
 
-enum NativeCommand {
-    Clear,
-    Ls(String),
-    ChangeDir(String),
-    Cat(String),
-}
+pub mod native {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        process,
+        str::SplitWhitespace,
+    };
 
-impl CommandExecution for NativeCommand {
-    fn execute_command(&self) -> Result<CommandOutcome> {
-        match self {
-            Self::Clear => {
-                let clear_options =
-                    crate::utils::ClearOptions::new(crossterm::terminal::ClearType::Purge);
-                crate::utils::clear_terminal(Some(clear_options))?;
-                Ok(CommandOutcome::Continue)
-            }
-            Self::Ls(path) => {
-                let path = if path.is_empty() { "." } else { path };
+    use anyhow::Result;
 
-                process::Command::new(CMD)
-                    .arg("/c")
-                    .arg("dir")
-                    .arg(path)
-                    .spawn()?
-                    .wait()?;
-                Ok(CommandOutcome::Continue)
-            }
-            Self::ChangeDir(new_dir) => {
-                std::env::set_current_dir(new_dir)?;
-                Ok(CommandOutcome::Continue)
-            }
-            Self::Cat(path) => {
-                if path.is_empty() {
-                    Err(anyhow::anyhow!("no file specified"))
-                } else {
-                    let file = File::open(path)?;
-                    let buf_read = BufReader::new(file);
-                    for line in buf_read.lines() {
-                        println!("{}", line?);
-                    }
-                    println!();
+    use crate::commands::{
+        CommandOutcome,
+        core::{CMD, CommandExecution},
+    };
 
+    pub enum NativeCommand {
+        Clear,
+        Ls(String),
+        ChangeDir(String),
+        Cat(String),
+    }
+
+    impl CommandExecution for NativeCommand {
+        fn execute_command(&self) -> Result<CommandOutcome> {
+            match self {
+                Self::Clear => {
+                    let clear_options =
+                        crate::utils::ClearOptions::new(crossterm::terminal::ClearType::Purge);
+                    crate::utils::clear_terminal(Some(clear_options))?;
                     Ok(CommandOutcome::Continue)
+                }
+                Self::Ls(path) => {
+                    let path = if path.is_empty() { "." } else { path };
+
+                    process::Command::new(CMD)
+                        .arg("/c")
+                        .arg("dir")
+                        .arg(path)
+                        .spawn()?
+                        .wait()?;
+                    Ok(CommandOutcome::Continue)
+                }
+                Self::ChangeDir(new_dir) => {
+                    std::env::set_current_dir(new_dir)?;
+                    Ok(CommandOutcome::Continue)
+                }
+                Self::Cat(path) => {
+                    if path.is_empty() {
+                        Err(anyhow::anyhow!("no file specified"))
+                    } else {
+                        let file = File::open(path)?;
+                        let buf_read = BufReader::new(file);
+                        for line in buf_read.lines() {
+                            println!("{}", line?);
+                        }
+                        println!();
+
+                        Ok(CommandOutcome::Continue)
+                    }
                 }
             }
         }
     }
-}
 
-impl NativeCommand {
-    const CLEAR: &str = "clear";
-    const LS: &str = "ls";
-    const CD: &str = "cd";
-    const CHDIR: &str = "chdir";
-    const CAT: &str = "cat";
+    impl NativeCommand {
+        const CLEAR: &str = "clear";
+        const LS: &str = "ls";
+        const CD: &str = "cd";
+        const CHDIR: &str = "chdir";
+        const CAT: &str = "cat";
 
-    fn try_from_executable_and_args(executable: &str, args: SplitWhitespace) -> Result<Self> {
-        match executable.to_lowercase().as_str() {
-            Self::CLEAR => Ok(Self::Clear),
-            Self::LS => Ok(Self::Ls(args.collect())),
-            Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
-            Self::CAT => {
-                let mut cloned_args = args.clone();
-                let path = cloned_args.next().unwrap_or_default();
-                if cloned_args.next().is_some() {
-                    return Err(anyhow::anyhow!("cat accepts only a single path argument"));
+        pub fn try_from_executable_and_args(
+            executable: &str,
+            args: SplitWhitespace,
+        ) -> Result<Self> {
+            match executable.to_lowercase().as_str() {
+                Self::CLEAR => Ok(Self::Clear),
+                Self::LS => Ok(Self::Ls(args.collect())),
+                Self::CD | Self::CHDIR => Ok(Self::ChangeDir(args.collect())),
+                Self::CAT => {
+                    let mut cloned_args = args.clone();
+                    let path = cloned_args.next().unwrap_or_default();
+                    if cloned_args.next().is_some() {
+                        return Err(anyhow::anyhow!("cat accepts only a single path argument"));
+                    }
+                    Ok(Self::Cat(path.to_string()))
                 }
-                Ok(Self::Cat(path.to_string()))
+                _ => Err(anyhow::anyhow!(
+                    "unknown native command \"{executable}\" with args {:?}",
+                    args
+                )),
             }
-            _ => Err(anyhow::anyhow!(
-                "unknown native command \"{executable}\" with args {:?}",
-                args
-            )),
         }
     }
 }
