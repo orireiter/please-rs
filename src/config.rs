@@ -5,17 +5,19 @@ use std::{
 };
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
 use crate::{commands::config::CommandConfig, history::HistoryConfig};
 
-#[derive(Clone, Default, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Default, Deserialize, JsonSchema)]
 pub struct PleaseConfig {
     pub command: CommandConfig,
     pub history: HistoryConfig,
 }
 
 impl PleaseConfig {
+    const REMOTE_SCHEMA_LOCATION: &str =
+        "https://github.com/orireiter/please-rs/releases/latest/download/please_config.schema.json";
     const CONFIG_FILENAME: &str = ".please_config";
 
     pub fn get_from_filesystem() -> Self {
@@ -63,3 +65,18 @@ impl PleaseConfig {
         default_conf
     }
 }
+
+impl Serialize for PleaseConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("PleaseConfig", 3)?;
+        state.serialize_field("command", &self.command)?;
+        state.serialize_field("history", &self.history)?;
+        state.serialize_field("$schema", Self::REMOTE_SCHEMA_LOCATION)?;
+        state.end()
+    }
+}
+
+// todo add test to make sure the json schema remote address actually retrieves it
