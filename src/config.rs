@@ -9,10 +9,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::{commands::config::CommandConfig, history::HistoryConfig};
 
-#[derive(Clone, Default, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Debug)]
 pub struct PleaseConfig {
     pub command: CommandConfig,
     pub history: HistoryConfig,
+}
+
+#[derive(Serialize)]
+struct PleaseConfigWithSchema<'a> {
+    #[serde(flatten)]
+    config: PleaseConfig,
+    schema: &'a str,
+}
+
+impl Default for PleaseConfigWithSchema<'_> {
+    fn default() -> Self {
+        Self {
+            config: Default::default(),
+            schema: "https://github.com/orireiter/please-rs/releases/latest/download/please_config.schema.json",
+        }
+    }
 }
 
 impl PleaseConfig {
@@ -53,7 +69,8 @@ impl PleaseConfig {
             .and_then(|p| File::create(p).ok())
             .and_then(|f| {
                 let writer = BufWriter::new(f);
-                serde_json::to_writer_pretty(writer, &default_conf).ok()
+                let config_with_schema = &PleaseConfigWithSchema::default();
+                serde_json::to_writer_pretty(writer, config_with_schema).ok()
             })
             .is_none()
         {
@@ -61,5 +78,20 @@ impl PleaseConfig {
         }
 
         default_conf
+    }
+}
+
+// todo add test to make sure the json schema remote address actually retrieves it
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{PleaseConfig, PleaseConfigWithSchema};
+
+    #[test]
+    fn default_config_and_config_with_schema_are_same() {
+        assert_eq!(
+            PleaseConfig::default(),
+            PleaseConfigWithSchema::default().config
+        )
     }
 }
