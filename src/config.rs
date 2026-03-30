@@ -5,19 +5,33 @@ use std::{
 };
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize, ser::SerializeStruct};
+use serde::{Deserialize, Serialize};
 
 use crate::{commands::config::CommandConfig, history::HistoryConfig};
 
-#[derive(Clone, Default, Deserialize, JsonSchema)]
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Debug)]
 pub struct PleaseConfig {
     pub command: CommandConfig,
     pub history: HistoryConfig,
 }
 
+#[derive(Serialize)]
+struct PleaseConfigWithSchema<'a> {
+    #[serde(flatten)]
+    config: PleaseConfig,
+    schema: &'a str,
+}
+
+impl Default for PleaseConfigWithSchema<'_> {
+    fn default() -> Self {
+        Self {
+            config: Default::default(),
+            schema: "https://github.com/orireiter/please-rs/releases/latest/download/please_config.schema.json",
+        }
+    }
+}
+
 impl PleaseConfig {
-    const REMOTE_SCHEMA_LOCATION: &str =
-        "https://github.com/orireiter/please-rs/releases/latest/download/please_config.schema.json";
     const CONFIG_FILENAME: &str = ".please_config";
 
     pub fn get_from_filesystem() -> Self {
@@ -55,7 +69,8 @@ impl PleaseConfig {
             .and_then(|p| File::create(p).ok())
             .and_then(|f| {
                 let writer = BufWriter::new(f);
-                serde_json::to_writer_pretty(writer, &default_conf).ok()
+                let config_with_schema = &PleaseConfigWithSchema::default();
+                serde_json::to_writer_pretty(writer, config_with_schema).ok()
             })
             .is_none()
         {
@@ -66,17 +81,17 @@ impl PleaseConfig {
     }
 }
 
-impl Serialize for PleaseConfig {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("PleaseConfig", 3)?;
-        state.serialize_field("command", &self.command)?;
-        state.serialize_field("history", &self.history)?;
-        state.serialize_field("$schema", Self::REMOTE_SCHEMA_LOCATION)?;
-        state.end()
+// todo add test to make sure the json schema remote address actually retrieves it
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{PleaseConfig, PleaseConfigWithSchema};
+
+    #[test]
+    fn default_config_and_config_with_schema_are_same() {
+        assert_eq!(
+            PleaseConfig::default(),
+            PleaseConfigWithSchema::default().config
+        )
     }
 }
-
-// todo add test to make sure the json schema remote address actually retrieves it

@@ -8,13 +8,13 @@ fn default_color() -> Color {
     Color::White
 }
 
-#[derive(Default, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Default, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Debug)]
 pub struct CommandConfig {
     pub prefix_config: CommandPrefixConfig,
     pub completion_config: CommandCompletionConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct DelimiterConfig {
     pub delimiter: String,
 
@@ -31,7 +31,7 @@ impl DelimiterConfig {
         }
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct CommandPrefixConfig {
     pub prefix_to_command_delimiter: DelimiterConfig,
     pub prefix_elements_delimiter: DelimiterConfig,
@@ -68,13 +68,13 @@ pub mod prefix_elements {
 
     pub type PrefixElementConfig = (PrefixElement, ElementConfig);
 
-    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
     pub enum PrefixElementDisplayParts {
         ValueOnly,
         KeyValue(String),
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
     pub struct ElementConfig {
         pub display_parts: PrefixElementDisplayParts,
         pub key_value_delimiter: Option<String>,
@@ -84,7 +84,7 @@ pub mod prefix_elements {
         pub color: Color,
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
     pub enum PrefixElement {
         Dir(DirType),
         Git,
@@ -100,14 +100,14 @@ pub mod prefix_elements {
         CurrentOnly,
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+    #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
     pub struct CustomPrefixElementConfig {
         pub command: String,
         pub args: Vec<String>,
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct CommandCompletionConfig {
     pub providers: Vec<CommandCompletionProviderEnum>,
 }
@@ -123,7 +123,7 @@ impl Default for CommandCompletionConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub enum CommandCompletionProviderEnum {
     Dir,
     Git,

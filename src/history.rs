@@ -14,7 +14,7 @@ pub enum Direction {
     Next,
 }
 
-#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema, PartialEq, Debug)]
 pub struct HistoryConfig {
     persistent_file: PathBuf,
     max_commands_in_persistent_file: usize,
