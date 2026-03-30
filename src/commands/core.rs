@@ -308,12 +308,12 @@ pub mod please {
 
         fn try_from(mut value: SplitWhitespace) -> std::result::Result<Self, Self::Error> {
             let main_arg = if let Some(content) = value.next() {
-                content
+                content.to_lowercase()
             } else {
                 return Err(anyhow::anyhow!("no main argument supplied for please"));
             };
 
-            match PLEASE_COMMANDS_MAP.get(main_arg) {
+            match PLEASE_COMMANDS_MAP.get(main_arg.as_str()) {
                 Some(cmd) => Ok(cmd.clone()),
                 None => Err(anyhow::anyhow!(
                     "unknown please command argument {:?}",

@@ -305,7 +305,7 @@ impl PleaseTerminal {
         let history_object = history::History::from_config(config.history.clone())?;
         let command_object = LiveCommand::from_config(config.command.clone());
 
-        Ok(Self::new(history_object, command_object, config.clone()))
+        Ok(Self::new(history_object, command_object, config))
     }
 
     fn handle_event(
