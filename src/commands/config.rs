@@ -116,6 +116,7 @@ impl Default for CommandCompletionConfig {
     fn default() -> Self {
         Self {
             providers: vec![
+                CommandCompletionProviderEnum::Please,
                 CommandCompletionProviderEnum::Git,
                 CommandCompletionProviderEnum::Dir,
             ],
@@ -127,6 +128,7 @@ impl Default for CommandCompletionConfig {
 pub enum CommandCompletionProviderEnum {
     Dir,
     Git,
+    Please,
     Custom,
 }
 
@@ -247,7 +249,7 @@ mod tests {
                 ]
             },
             "completion_config": {
-               "providers": ["Git", "Dir"]
+               "providers": ["Please", "Git", "Dir"]
             }
         });
 

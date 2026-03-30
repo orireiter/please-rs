@@ -58,6 +58,12 @@ impl terminal_traits::KeyHandling for PleaseTerminal {
                 self.history.add_command_to_cache(attempted_command);
                 return CommandOutcome::Close;
             }
+            Ok(CommandOutcome::Reload) => {
+                if let Err(e) = self.reload() {
+                    log::error!("failed to reload, error: {e}");
+                };
+                CommandOutcome::Continue
+            }
             Ok(command_outcome) => command_outcome,
             Err(e) => {
                 log::error!("failed to execute command \"{attempted_command}\", error: {e}");
@@ -295,6 +301,13 @@ impl PleaseTerminal {
         }
     }
 
+    pub fn from_config(config: PleaseConfig) -> Result<Self> {
+        let history_object = history::History::from_config(config.history.clone())?;
+        let command_object = LiveCommand::from_config(config.command.clone());
+
+        Ok(Self::new(history_object, command_object, config.clone()))
+    }
+
     fn handle_event(
         &mut self,
         stdout: &mut std::io::Stdout,
@@ -355,9 +368,7 @@ impl PleaseTerminal {
             }
         }
 
-        self.history.save_history_to_persistent_file()?;
-
-        Ok(())
+        self.teardown()
     }
 
     fn handle_char_added(&mut self, stdout: &mut std::io::Stdout, new_char: char) -> Result<()> {
@@ -581,5 +592,24 @@ impl PleaseTerminal {
             // adding 1 to cross delimiter
             .map(|index| index + 1)
             .unwrap_or(self.cursor_position)
+    }
+
+    fn teardown(&self) -> Result<()> {
+        self.history.save_history_to_persistent_file()?;
+        Ok(())
+    }
+
+    fn reload(&mut self) -> Result<()> {
+        self.teardown()?;
+
+        let new_config = PleaseConfig::get_from_filesystem();
+
+        let new_copy = Self::from_config(new_config.clone())?;
+
+        self.config = new_config;
+        self.history = new_copy.history;
+        self.live_command = new_copy.live_command;
+
+        Ok(())
     }
 }

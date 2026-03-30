@@ -140,8 +140,8 @@ impl LiveCommand {
             return Ok(CommandOutcome::Continue);
         };
 
-        if PleaseCommand::is_please_command(executable) {
-            let please_command = PleaseCommand::try_from(splitted_command)?;
+        if please::PleaseCommand::is_please_command(executable) {
+            let please_command = please::PleaseCommand::try_from(splitted_command)?;
             return please_command.execute_command();
         } else if let Ok(native_command) =
             NativeCommand::try_from_executable_and_args(executable, splitted_command.clone())
@@ -265,43 +265,61 @@ trait CommandExecution {
     fn execute_command(&self) -> Result<CommandOutcome>;
 }
 
-enum PleaseCommand {
-    Exit,
-}
+pub mod please {
+    use std::{collections::HashMap, str::SplitWhitespace, sync::LazyLock};
 
-impl PleaseCommand {
-    const EXECUTABLE_NAME: &str = "please";
-    const EXIT: &str = "exit";
+    use anyhow::Result;
 
-    fn is_please_command(executable: &str) -> bool {
-        executable == Self::EXECUTABLE_NAME
+    use crate::commands::{CommandOutcome, core::CommandExecution};
+
+    #[derive(Clone)]
+    pub enum PleaseCommand {
+        Exit,
+        Reload,
     }
-}
 
-impl CommandExecution for PleaseCommand {
-    fn execute_command(&self) -> Result<CommandOutcome> {
-        match self {
-            Self::Exit => Ok(CommandOutcome::Close),
+    pub static PLEASE_COMMANDS_MAP: LazyLock<HashMap<&'static str, PleaseCommand>> =
+        LazyLock::new(|| {
+            HashMap::from([
+                ("exit", PleaseCommand::Exit),
+                ("reload", PleaseCommand::Reload),
+            ])
+        });
+
+    impl PleaseCommand {
+        pub const EXECUTABLE_NAME: &str = "please";
+
+        pub fn is_please_command(executable: &str) -> bool {
+            executable.eq_ignore_ascii_case(Self::EXECUTABLE_NAME)
         }
     }
-}
 
-impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
-    type Error = anyhow::Error;
+    impl CommandExecution for PleaseCommand {
+        fn execute_command(&self) -> Result<CommandOutcome> {
+            match self {
+                Self::Exit => Ok(CommandOutcome::Close),
+                Self::Reload => Ok(CommandOutcome::Reload),
+            }
+        }
+    }
 
-    fn try_from(mut value: SplitWhitespace) -> std::result::Result<Self, Self::Error> {
-        let main_arg = if let Some(content) = value.next() {
-            content
-        } else {
-            return Err(anyhow::anyhow!("no main argument supplied for please"));
-        };
+    impl<'a> TryFrom<SplitWhitespace<'a>> for PleaseCommand {
+        type Error = anyhow::Error;
 
-        match main_arg {
-            Self::EXIT => Ok(Self::Exit),
-            _ => Err(anyhow::anyhow!(
-                "unknown please command argument {:?}",
-                value
-            )),
+        fn try_from(mut value: SplitWhitespace) -> std::result::Result<Self, Self::Error> {
+            let main_arg = if let Some(content) = value.next() {
+                content
+            } else {
+                return Err(anyhow::anyhow!("no main argument supplied for please"));
+            };
+
+            match PLEASE_COMMANDS_MAP.get(main_arg) {
+                Some(cmd) => Ok(cmd.clone()),
+                None => Err(anyhow::anyhow!(
+                    "unknown please command argument {:?}",
+                    value
+                )),
+            }
         }
     }
 }
@@ -386,5 +404,6 @@ impl NativeCommand {
 pub enum CommandOutcome {
     Continue,
     Close,
+    Reload,
     Skip,
 }

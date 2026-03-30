@@ -1,10 +1,19 @@
 mod dir;
 mod git;
+mod please;
 
-use crate::commands::{
-    completion::{dir::DirectoryCompletionProvider, git::GitCompletionProvider},
-    config::{CommandCompletionConfig, CommandCompletionProviderEnum},
-    traits::CompletionProvider,
+use anyhow::Result;
+
+use crate::{
+    commands::{
+        completion::{
+            dir::DirectoryCompletionProvider, git::GitCompletionProvider,
+            please::PleaseCompletionProvider,
+        },
+        config::{CommandCompletionConfig, CommandCompletionProviderEnum},
+        traits::{CompletionCandidate, CompletionProvider, ConcatType},
+    },
+    utils::SPACE,
 };
 
 pub fn get_completion_provider(
@@ -31,8 +40,44 @@ fn get_provider_from_enum(
     match provider_enum {
         CommandCompletionProviderEnum::Dir => Box::new(DirectoryCompletionProvider),
         CommandCompletionProviderEnum::Git => Box::new(GitCompletionProvider),
+        CommandCompletionProviderEnum::Please => Box::new(PleaseCompletionProvider),
         CommandCompletionProviderEnum::Custom => todo!(),
     }
+}
+
+pub fn try_completing_from_static_options(
+    executable_name: &str,
+    possible_completions: &[&str],
+    current_command: &str,
+) -> Result<Vec<CompletionCandidate>> {
+    let mut splitted_command = current_command.split_whitespace();
+    let last_element = splitted_command.next_back().unwrap_or_default();
+
+    if splitted_command.next_back().is_none() {
+        let concat_type = if current_command.trim().eq_ignore_ascii_case(executable_name) {
+            ConcatType::Delimited(SPACE.to_string())
+        } else {
+            ConcatType::PrefixConcat(0)
+        };
+
+        return Ok(possible_completions
+            .iter()
+            .map(|command| CompletionCandidate::new(command.to_string(), concat_type.clone()))
+            .collect());
+    }
+
+    let filtered_commands = possible_completions
+        .iter()
+        .filter_map(|command| match command.starts_with(last_element) {
+            true => Some(CompletionCandidate::new(
+                command.to_string(),
+                crate::commands::traits::ConcatType::PrefixConcat(last_element.len()),
+            )),
+            false => None,
+        })
+        .collect();
+
+    Ok(filtered_commands)
 }
 
 #[cfg(test)]
